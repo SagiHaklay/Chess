@@ -10,27 +10,51 @@ class Program
         black = new Player(false);
         InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
-        PlayerMove move = GetUserInput(true);
-        chessBoard.MovePiece(move);
+        PlayerTurn(white, chessBoard);
         Console.WriteLine(chessBoard);
-        /*chessBoard.MovePiece(1, 0, 3, 0);
+        PlayerTurn(black, chessBoard);
         Console.WriteLine(chessBoard);
-        chessBoard.MovePiece(7, 1, 5, 2);
-        Console.WriteLine(chessBoard);*/
     }
-    static PlayerMove GetUserInput(bool white)
+    static void PlayerTurn(Player player, ChessBoard chessBoard)
     {
-        string input;
+        bool legalMove = false;
+        PlayerMove move;
+        while (!legalMove)
+        {
+            move = GetUserInput(player);
+            if (move.GetStartRow() == move.GetEndRow() && move.GetStartColumn() == move.GetEndColumn())
+            {
+                Console.WriteLine("Start position is identical to end position!");
+                continue;
+            }
+            ChessPiece? piece = chessBoard.GetPiece(move.GetStartRow(), move.GetStartColumn());
+            if (piece == null)
+            {
+                Console.WriteLine("No piece to move!");
+                continue;
+            }
+            if (!piece.GetPlayer().Equals(player))
+            {
+                Console.WriteLine("{0} cannot move {1}'s piece!", player, piece.GetPlayer());
+                continue;
+            }
+            // is move legal
+            legalMove = chessBoard.MovePiece(move);
+        }
+    }
+    static PlayerMove GetUserInput(Player player)
+    {
+        string? input;
         PlayerMove? move;
-        Console.WriteLine("{0} player please enter a move:", white? "White" : "Black");
-        input = Console.ReadLine() ?? "";
-        move = PlayerMove.FromString(input.Trim());
+        Console.WriteLine("{0} please enter a move:", player);
+        input = Console.ReadLine();
+        move = PlayerMove.FromString(input != null? input.Trim() : null);
         while (move == null)
         {
             Console.WriteLine("Invalid move!");
-            Console.WriteLine("{0} player please enter a move:", white? "White" : "Black");
+            Console.WriteLine("{0} please enter a move:", player);
             input = Console.ReadLine() ?? "";
-            move = PlayerMove.FromString(input.Trim());
+            move = PlayerMove.FromString(input != null? input.Trim() : null);
         }
         return move;
     }
@@ -212,12 +236,15 @@ class ChessBoard
         ChessPiece? piece = GetPiece(startRow, startColumn);
         if (piece == null)
             return false;
-        if (startRow == endRow && startColumn == endColumn)
-            return false;
+        
+        board[startRow, startColumn] = null;
         bool canPlace = PlacePiece(piece, endRow, endColumn);
         if (!canPlace)
+        {
+            board[startRow, startColumn] = piece;
             return false;
-        board[startRow, startColumn] = null;
+        }
+        
         return true;
     }
     public bool MovePiece(PlayerMove move)
@@ -258,7 +285,7 @@ class Player
     }
     public override string ToString()
     {
-        return string.Format("Player {0}", white? "white" : "black");
+        return string.Format("{0} Player", white? "White" : "Black");
     }
     public void AddPiece(ChessPiece piece)
     {
@@ -267,6 +294,16 @@ class Player
             pieces[pieceCount] = piece;
             pieceCount++;
         }
+    }
+    public override bool Equals(object? obj)
+    {
+        if (!(obj is Player)) return false;
+        Player other = (Player)obj;
+        return white == other.white;
+    }
+    public override int GetHashCode()
+    {
+        return base.GetHashCode();
     }
 }
 class PlayerMove
@@ -308,8 +345,10 @@ class PlayerMove
         result += (endRow + 1);
         return result;
     }
-    public static PlayerMove? FromString(string moveString)
+    public static PlayerMove? FromString(string? moveString)
     {
+        if (moveString == null)
+            return null;
         if (moveString.Length != 4)
             return null;
         int startColumn = CharToColumn(moveString[0]);
