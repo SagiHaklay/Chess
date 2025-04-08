@@ -10,10 +10,29 @@ class Program
         black = new Player(false);
         InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
+        PlayerMove move = GetUserInput(true);
+        chessBoard.MovePiece(move);
+        Console.WriteLine(chessBoard);
         /*chessBoard.MovePiece(1, 0, 3, 0);
         Console.WriteLine(chessBoard);
         chessBoard.MovePiece(7, 1, 5, 2);
         Console.WriteLine(chessBoard);*/
+    }
+    static PlayerMove GetUserInput(bool white)
+    {
+        string input;
+        PlayerMove? move;
+        Console.WriteLine("{0} player please enter a move:", white? "White" : "Black");
+        input = Console.ReadLine() ?? "";
+        move = PlayerMove.FromString(input.Trim());
+        while (move == null)
+        {
+            Console.WriteLine("Invalid move!");
+            Console.WriteLine("{0} player please enter a move:", white? "White" : "Black");
+            input = Console.ReadLine() ?? "";
+            move = PlayerMove.FromString(input.Trim());
+        }
+        return move;
     }
 
     static void InitializeBoard(ChessBoard chessBoard, Player black, Player white)
@@ -193,11 +212,17 @@ class ChessBoard
         ChessPiece? piece = GetPiece(startRow, startColumn);
         if (piece == null)
             return false;
+        if (startRow == endRow && startColumn == endColumn)
+            return false;
         bool canPlace = PlacePiece(piece, endRow, endColumn);
         if (!canPlace)
             return false;
         board[startRow, startColumn] = null;
         return true;
+    }
+    public bool MovePiece(PlayerMove move)
+    {
+        return MovePiece(move.GetStartRow(), move.GetStartColumn(), move.GetEndRow(), move.GetEndColumn());
     }
     public override string ToString()
     {
@@ -242,5 +267,132 @@ class Player
             pieces[pieceCount] = piece;
             pieceCount++;
         }
+    }
+}
+class PlayerMove
+{
+    int startRow;
+    int startColumn;
+    int endRow;
+    int endColumn;
+    public PlayerMove(int startRow, int startColumn, int endRow, int endColumn)
+    {
+        this.startRow = startRow;
+        this.startColumn = startColumn;
+        this.endRow = endRow;
+        this.endColumn = endColumn;
+    }
+    public int GetStartRow()
+    {
+        return startRow;
+    }
+    public int GetStartColumn()
+    {
+        return startColumn;
+    }
+    public int GetEndRow()
+    {
+        return endRow;
+    }
+    public int GetEndColumn()
+    {
+        return endColumn;
+    }
+    public override string ToString()
+    {
+        string result = "";
+        string columnChars = "ABCDEFGH";
+        result += columnChars[startColumn];
+        result += (startRow + 1);
+        result += columnChars[endColumn];
+        result += (endRow + 1);
+        return result;
+    }
+    public static PlayerMove? FromString(string moveString)
+    {
+        if (moveString.Length != 4)
+            return null;
+        int startColumn = CharToColumn(moveString[0]);
+        if (startColumn == -1)
+            return null;
+        int startRow = CharToRow(moveString[1]);
+        if (startRow == -1)
+            return null;
+        int endColumn = CharToColumn(moveString[2]);
+        if (endColumn == -1)
+            return null;
+        int endRow = CharToRow(moveString[3]);
+        if (endRow == -1)
+            return null;
+        return new PlayerMove(startRow, startColumn, endRow, endColumn);
+    }
+    static int CharToColumn(char letter)
+    {
+        int num = -1;
+        switch (letter)
+        {
+            case 'A': case 'a':
+                num = 0;
+                break;
+            case 'B': case 'b':
+                num = 1;
+                break;
+            case 'C': case 'c':
+                num = 2;
+                break;
+            case 'D': case 'd':
+                num = 3;
+                break;
+            case 'E': case 'e':
+                num = 4;
+                break;
+            case 'F': case 'f':
+                num = 5;
+                break;
+            case 'G': case 'g':
+                num = 6;
+                break;
+            case 'H': case 'h':
+                num = 7;
+                break;
+            default:
+                break;
+        }
+        return num;
+    }
+    static int CharToRow(char number)
+    {
+        int num = -1;
+        
+        switch (number)
+        {
+            case '1':
+                num = 0;
+                break;
+            case '2':
+                num = 1;
+                break;
+            case '3':
+                num = 2;
+                break;
+            case '4':
+                num = 3;
+                break;
+            case '5':
+                num = 4;
+                break;
+            case '6':
+                num = 5;
+                break;
+            case '7':
+                num = 6;
+                break;
+            case '8':
+                num = 7;
+                break;
+            default:
+                break;
+        }
+        return num;
     }
 }
