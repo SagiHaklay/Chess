@@ -7,17 +7,24 @@ class Program
         ChessBoard chessBoard = new ChessBoard();
         Player white, black;
         bool whiteTurn = true, turnComplete;
-        white = new ComputerPlayer(true, new string[] {"a2a4", "b1c3"});
+        white = new Player(true);
         black = new Player(false);
         InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
         
         do
         {
-            turnComplete = PlayerTurn(whiteTurn? white : black, chessBoard);
+            Player currentPlayer = whiteTurn? white : black;
+            Player opponent = whiteTurn? black : white;
+            currentPlayer.SetDrawRequest(false);
+            turnComplete = PlayerTurn(currentPlayer, chessBoard, opponent.IsDrawRequest());
             Console.WriteLine(chessBoard);
             whiteTurn = !whiteTurn;
         } while (turnComplete);
+        if (white.IsDrawRequest() && black.IsDrawRequest())
+        {
+            Console.WriteLine("The game ends in a draw by agreement!");
+        }
         /*PlayerTurn(white, chessBoard);
         Console.WriteLine(chessBoard);
         PlayerTurn(black, chessBoard);
@@ -79,13 +86,13 @@ class Program
         */
     }
     
-    static bool PlayerTurn(Player player, ChessBoard chessBoard)
+    static bool PlayerTurn(Player player, ChessBoard chessBoard, bool activeDrawRequest)
     {
         bool legalMove = false;
         PlayerMove? move;
         while (!legalMove)
         {
-            move = player is ComputerPlayer? ((ComputerPlayer)player).GetNextMove() : GetUserInput(player);
+            move = player is ComputerPlayer? ((ComputerPlayer)player).GetNextMove() : GetUserInput(player, activeDrawRequest);
             if (move == null)
                 return false;
             if (move.GetStartRow() == move.GetEndRow() && move.GetStartColumn() == move.GetEndColumn())
@@ -122,19 +129,36 @@ class Program
         }
         return true;
     }
-    static PlayerMove? GetUserInput(Player player)
+    static PlayerMove? GetUserInput(Player player, bool activeDrawRequest)
     {
         string? input;
-        PlayerMove? move;
-        Console.WriteLine("{0} please enter a move:", player);
-        input = Console.ReadLine();
-        move = PlayerMove.FromString(input != null? input.Trim() : null);
+        string userInput;
+        PlayerMove? move = null;
+        bool invalid = false;
+        
         while (move == null)
         {
-            Console.WriteLine("Invalid move!");
+            if (invalid)
+                Console.WriteLine("Invalid move format!");
             Console.WriteLine("{0} please enter a move:", player);
-            input = Console.ReadLine() ?? "";
-            move = PlayerMove.FromString(input != null? input.Trim() : null);
+            input = Console.ReadLine();
+            userInput = input != null? input.Trim() : "";
+            if (userInput == "DRAW" && !player.IsDrawRequest())
+            {
+                player.SetDrawRequest(true);
+                if (activeDrawRequest)
+                {
+                    Console.WriteLine("{0} agrees to a draw!", player);
+                    return null;
+                }
+                Console.WriteLine("{0} requests a draw!", player);
+                Console.WriteLine("{0} please enter a move:", player);
+                input = Console.ReadLine();
+                userInput = input != null? input.Trim() : "";
+            }
+                
+            move = PlayerMove.FromString(userInput);
+            invalid = move == null;
         }
         return move;
     }
@@ -468,11 +492,21 @@ class Player
     bool white;
     ChessPiece[] pieces;
     int pieceCount;
+    bool drawRequest;
     public Player(bool white)
     {
         this.white = white;
         pieces = new ChessPiece[16];
         pieceCount = 0;
+        SetDrawRequest(false);
+    }
+    public bool IsDrawRequest()
+    {
+        return drawRequest;
+    }
+    public void SetDrawRequest(bool drawRequest)
+    {
+        this.drawRequest = drawRequest;
     }
     public bool IsWhite()
     {
