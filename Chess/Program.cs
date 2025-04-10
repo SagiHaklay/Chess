@@ -6,11 +6,19 @@ class Program
     {
         ChessBoard chessBoard = new ChessBoard();
         Player white, black;
-        white = new Player(true);
+        bool whiteTurn = true, turnComplete;
+        white = new ComputerPlayer(true, new string[] {"a2a4", "b1c3"});
         black = new Player(false);
-        /*InitializeBoard(chessBoard, black, white);
+        InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
-        PlayerTurn(white, chessBoard);
+        
+        do
+        {
+            turnComplete = PlayerTurn(whiteTurn? white : black, chessBoard);
+            Console.WriteLine(chessBoard);
+            whiteTurn = !whiteTurn;
+        } while (turnComplete);
+        /*PlayerTurn(white, chessBoard);
         Console.WriteLine(chessBoard);
         PlayerTurn(black, chessBoard);
         Console.WriteLine(chessBoard);
@@ -70,13 +78,16 @@ class Program
         Console.WriteLine(queen2.IsLegalMove(new PlayerMove(2, 2, 1, 0), chessBoard));
         */
     }
-    static void PlayerTurn(Player player, ChessBoard chessBoard)
+    
+    static bool PlayerTurn(Player player, ChessBoard chessBoard)
     {
         bool legalMove = false;
-        PlayerMove move;
+        PlayerMove? move;
         while (!legalMove)
         {
-            move = GetUserInput(player);
+            move = player is ComputerPlayer? ((ComputerPlayer)player).GetNextMove() : GetUserInput(player);
+            if (move == null)
+                return false;
             if (move.GetStartRow() == move.GetEndRow() && move.GetStartColumn() == move.GetEndColumn())
             {
                 Console.WriteLine("Start position is identical to end position!");
@@ -101,10 +112,17 @@ class Program
                 continue;
             }
             // is move legal
-            legalMove = chessBoard.MovePiece(move);
+            if (!piece.IsLegalMove(move, chessBoard))
+            {
+                Console.WriteLine("Move is illegal for {0}", piece);
+                continue;
+            }
+            chessBoard.Update(move);
+            legalMove = true;
         }
+        return true;
     }
-    static PlayerMove GetUserInput(Player player)
+    static PlayerMove? GetUserInput(Player player)
     {
         string? input;
         PlayerMove? move;
@@ -698,5 +716,31 @@ class PlayerMove
                 break;
         }
         return num;
+    }
+}
+
+class ComputerPlayer : Player
+{
+    int moveIndex;
+    PlayerMove?[] moves;
+    public ComputerPlayer(bool white, PlayerMove[] moves) : base(white) 
+    {
+        this.moves = moves;
+        moveIndex = 0;
+    }
+    public ComputerPlayer(bool white, string[] moveStrings) : base(white)
+    {
+        moves = new PlayerMove[moveStrings.Length];
+        for (int i = 0; i < moveStrings.Length; i++)
+            moves[i] = PlayerMove.FromString(moveStrings[i]);
+        moveIndex = 0;
+    }
+    public PlayerMove? GetNextMove()
+    {
+        if (moveIndex >= moves.Length)
+            return null;
+        PlayerMove? nextMove = moves[moveIndex];
+        moveIndex++;
+        return nextMove;
     }
 }
