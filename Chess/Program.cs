@@ -19,7 +19,7 @@ class Program
         ChessPiece queen1 = new Queen(white);
         ChessPiece queen2 = new Queen(white);
         chessBoard.PlacePiece(queen1, 3, 3);
-        chessBoard.PlacePiece(queen2, 2, 2);*/
+        chessBoard.PlacePiece(queen2, 2, 2);
         ChessPiece king = new King(white);
         ChessPiece knight = new Knight(black);
         chessBoard.PlacePiece(knight, 3, 3);
@@ -27,7 +27,29 @@ class Program
         chessBoard.PlacePiece(new Rook(black), 3, 4);
         chessBoard.PlacePiece(new Rook(white), 4, 4);
         chessBoard.PlacePiece(new Rook(black), 2, 2);
+        Pawn bp = new Pawn(black);
+        Pawn wp = new Pawn(white);
+        chessBoard.PlacePiece(wp, 2, 3);
+        chessBoard.PlacePiece(bp, 6, 4);
+        //chessBoard.PlacePiece(new Pawn(black), 2, 2);
+        //chessBoard.PlacePiece(new Pawn(white), 6, 2);
         Console.WriteLine(chessBoard);
+        chessBoard.Update(new PlayerMove(2, 3, 4, 3));
+        Console.WriteLine(chessBoard);
+        //Console.WriteLine(wp.IsEnPassantPossible()); // true
+        chessBoard.Update(new PlayerMove(6, 4, 4, 4));
+        Console.WriteLine(chessBoard);
+        Console.WriteLine(wp.IsLegalMove(new PlayerMove(4, 3, 5, 3), chessBoard)); // true
+        Console.WriteLine(wp.IsLegalMove(new PlayerMove(4, 3, 6, 3), chessBoard)); // false
+        Console.WriteLine(wp.IsLegalMove(new PlayerMove(4, 3, 5, 4), chessBoard)); // true
+        //Console.WriteLine(wp.IsLegalMove(new PlayerMove(1, 3, 0, 3), chessBoard)); // false
+        Console.WriteLine(bp.IsLegalMove(new PlayerMove(4, 4, 3, 4), chessBoard)); // true
+        Console.WriteLine(bp.IsLegalMove(new PlayerMove(4, 4, 2, 4), chessBoard)); // false
+        Console.WriteLine(bp.IsLegalMove(new PlayerMove(4, 4, 3, 3), chessBoard)); // true
+        chessBoard.Update(new PlayerMove(4, 3, 5, 4));
+        Console.WriteLine(chessBoard);
+        //Console.WriteLine(bp.IsLegalMove(new PlayerMove(6, 3, 7, 3), chessBoard)); // false
+        
         Console.WriteLine(knight.IsLegalMove(new PlayerMove(3, 3, 4, 3), chessBoard)); // false
         Console.WriteLine(knight.IsLegalMove(new PlayerMove(3, 3, 3, 5), chessBoard)); // false
         Console.WriteLine(knight.IsLegalMove(new PlayerMove(3, 3, 4, 5), chessBoard)); // true
@@ -36,7 +58,7 @@ class Program
         Console.WriteLine(knight.IsLegalMove(new PlayerMove(3, 3, 1, 4), chessBoard)); // true
         Console.WriteLine(knight.IsLegalMove(new PlayerMove(3, 3, 1, 5), chessBoard)); // false
         
-        /*
+        
         Console.WriteLine(queen1.IsLegalMove(new PlayerMove(3, 3, 6, 3), chessBoard));
         Console.WriteLine(queen1.IsLegalMove(new PlayerMove(3, 3, 3, 4), chessBoard));
         Console.WriteLine(queen1.IsLegalMove(new PlayerMove(3, 3, 1, 3), chessBoard));
@@ -380,13 +402,13 @@ class ChessBoard
     public void Update(PlayerMove move)
     {
         ChessPiece? endPosition = GetPiece(move.GetEndRow(), move.GetEndColumn());
-        if (endPosition != null)
-            endPosition.SetCaptured(true);
+        
         bool canMove = MovePiece(move);
-        if (!canMove && endPosition != null)
-            endPosition.SetCaptured(false);
+        
         if (canMove)
         {
+            if (endPosition != null)
+                endPosition.SetCaptured(true);
             ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
             if (movedPiece != null)
                 movedPiece.UpdateAfterMove(move);
