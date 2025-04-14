@@ -71,13 +71,13 @@ class Program
         King king = new King(white);
         AddPieceToGame(knight, 3, 6, chessBoard);
         AddPieceToGame(queen, 2, 4, chessBoard);
-        AddPieceToGame(bp, 1, 7, chessBoard);
+        AddPieceToGame(new Bishop(black), 2, 7, chessBoard);
         AddPieceToGame(king, 0, 5, chessBoard);
         //chessBoard.PlacePiece(new Pawn(black), 2, 2);
         //chessBoard.PlacePiece(new Pawn(white), 6, 2);
         Console.WriteLine(chessBoard);
-        Console.WriteLine(king.HasLegalMoves(chessBoard));
-        Console.WriteLine(knight.HasLegalMoves(chessBoard));
+        Console.WriteLine(white.IsInCheck(chessBoard));
+        Console.WriteLine(white.HasLegalMoves(chessBoard));
         /*
         chessBoard.Update(new PlayerMove(2, 3, 4, 3));
         Console.WriteLine(chessBoard);
@@ -410,8 +410,15 @@ class Pawn : ChessPiece
 class Rook : ChessPiece
 {
 
-    
-    public Rook(Player player) : base(player) {}
+    int moveCount;
+    public Rook(Player player) : this(player, 0)
+    {
+
+    }
+    public Rook(Player player, int moveCount) : base(player)
+    {
+        this.moveCount = moveCount;
+    }
 
     public override string ToString()
     {
@@ -429,6 +436,18 @@ class Rook : ChessPiece
         if (HasLegalMovesAlongPath(currentRow, currentColumn + 1, 0, 1, chessBoard)) return true;
         if (HasLegalMovesAlongPath(currentRow, currentColumn - 1, 0, -1, chessBoard)) return true;
         return false;
+    }
+    public override void UpdateAfterMove(PlayerMove move)
+    {
+        moveCount++;
+    }
+    public override void Revert(PlayerMove move)
+    {
+        moveCount--;
+    }
+    public bool IsCastlingPossible()
+    {
+        return moveCount == 0;
     }
 }
 class Bishop : ChessPiece
@@ -522,8 +541,11 @@ class Queen : ChessPiece
 class King : ChessPiece
 {
 
-    
-    public King(Player player) : base(player) {}
+    int moveCount;
+    public King(Player player) : base(player) 
+    {
+        moveCount = 0;
+    }
 
     public override string ToString()
     {
@@ -552,17 +574,31 @@ class King : ChessPiece
         }
         return false;
     }
+    public override void UpdateAfterMove(PlayerMove move)
+    {
+        moveCount++;
+    }
+    public override void Revert(PlayerMove move)
+    {
+        moveCount--;
+    }
+    public bool IsCastlingPossible()
+    {
+        return moveCount == 0;
+    }
 }
 class ChessBoard
 {
     ChessPiece?[,] board;
     Player whitePlayer, blackPlayer;
     ChessPiece? endPosition, capturedPiece;
+    int fiftyMoveCounter;
     public ChessBoard(Player whitePlayer, Player blackPlayer)
     {
         board = new ChessPiece[8, 8];
         this.whitePlayer = whitePlayer;
         this.blackPlayer = blackPlayer;
+        fiftyMoveCounter = 0;
     }
     public bool PlacePiece(ChessPiece piece, int row, int column)
     {
@@ -613,6 +649,21 @@ class ChessBoard
     public Player GetBlackPlayer()
     {
         return blackPlayer;
+    }
+    public bool MakeMove(PlayerMove move)
+    {
+        bool result = Update(move);
+        if (!result) return false;
+        ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
+        if (movedPiece is Pawn || capturedPiece != null)
+            fiftyMoveCounter = 0;
+        else
+            fiftyMoveCounter++;
+        return true;
+    }
+    public bool FiftyMoveRule()
+    {
+        return fiftyMoveCounter >= 50;
     }
     public bool Update(PlayerMove move)
     {
