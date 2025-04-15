@@ -72,22 +72,23 @@ class Program
         King blackKing = new King(black);
         AddPieceToGame(whiteKing, 0, 4, chessBoard);
         AddPieceToGame(blackKing, 7, 4, chessBoard);
-        AddPieceToGame(new Rook(white), 0, 0, chessBoard);
-        AddPieceToGame(new Rook(white), 0, 7, chessBoard);
-        AddPieceToGame(new Rook(black), 7, 0, chessBoard);
-        AddPieceToGame(new Rook(black), 7, 7, chessBoard);
-        AddPieceToGame(wp, 6, 0, chessBoard);
+        AddPieceToGame(knight, 0, 0, chessBoard);
+        //AddPieceToGame(new Rook(white), 0, 7, chessBoard);
+        AddPieceToGame(new Rook(black), 1, 2, chessBoard);
+        //AddPieceToGame(new Rook(black), 7, 7, chessBoard);
+        //AddPieceToGame(wp, 6, 0, chessBoard);
         Console.WriteLine(chessBoard);
-        //Console.WriteLine(white.IsCastlingPossible(chessBoard));
-        Console.WriteLine(black.IsCastlingPossible(chessBoard));
+        Console.WriteLine(chessBoard.IsDeadPosition());
+        //Console.WriteLine(black.IsCastlingPossible(chessBoard));
         //AddPieceToGame(new Bishop(black), 2, 7, chessBoard);
         //AddPieceToGame(king, 0, 5, chessBoard);
         //chessBoard.PlacePiece(new Pawn(black), 2, 2);
         //chessBoard.PlacePiece(new Pawn(white), 6, 2);
-        PlayerMove move = new PlayerMove(7, 4, 7, 2);
-        Console.WriteLine(black.IsCastlingPossible(chessBoard, move));
-        //chessBoard.MakeMove(move);
-        //Console.WriteLine(chessBoard);
+        PlayerMove move = new PlayerMove(0, 0, 1, 2);
+        //Console.WriteLine(black.IsCastlingPossible(chessBoard, move));
+        chessBoard.MakeMove(move);
+        Console.WriteLine(chessBoard);
+        Console.WriteLine(chessBoard.IsDeadPosition());
         //CheckForPromotion(move, chessBoard);
         //Console.WriteLine(chessBoard);
         //Console.WriteLine(white.IsInCheck(chessBoard));
@@ -691,12 +692,14 @@ class ChessBoard
     Player whitePlayer, blackPlayer;
     ChessPiece? endPosition, capturedPiece;
     int fiftyMoveCounter;
+    int captureCount;
     public ChessBoard(Player whitePlayer, Player blackPlayer)
     {
         board = new ChessPiece[8, 8];
         this.whitePlayer = whitePlayer;
         this.blackPlayer = blackPlayer;
         fiftyMoveCounter = 0;
+        captureCount = 0;
     }
     public bool PlacePiece(ChessPiece piece, int row, int column)
     {
@@ -753,6 +756,8 @@ class ChessBoard
         bool result = Update(move);
         if (!result) return false;
         ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
+        if (capturedPiece != null)
+            captureCount++;
         if (movedPiece is Pawn || capturedPiece != null)
             fiftyMoveCounter = 0;
         else
@@ -842,7 +847,17 @@ class ChessBoard
         if (capturedPiece != null)
             capturedPiece.SetCaptured(false);
     }
-    
+    public bool IsDeadPosition()
+    {
+        int onBoardCount = whitePlayer.GetPieceCount() + blackPlayer.GetPieceCount() - captureCount;
+        if (whitePlayer.IsKingOnBoard() && blackPlayer.IsKingOnBoard())
+        {
+            if (onBoardCount == 2) return true;
+            if (onBoardCount == 3)
+                return whitePlayer.IsKnightOnBoard() || blackPlayer.IsKnightOnBoard();
+        }
+        return false;
+    }
     public override string ToString()
     {
         
@@ -882,6 +897,24 @@ class Player
         kingsideRookIndex = -1;
         queensideRookIndex = -1;
         SetDrawRequest(false);
+    }
+    
+    public bool IsKingOnBoard()
+    {
+        if (kingIndex == -1) return false;
+        ChessPiece king = pieces[kingIndex];
+        return !king.IsCaptured();
+    }
+    public bool IsKnightOnBoard()
+    {
+        for (int i = 0; i < pieceCount; i++)
+            if (pieces[i] is Knight && !pieces[i].IsCaptured())
+                return true;
+        return false;
+    }
+    public int GetPieceCount()
+    {
+        return pieceCount;
     }
     public bool IsInCheck(ChessBoard chessBoard)
     {
