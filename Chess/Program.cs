@@ -8,8 +8,8 @@ class Program
         Player white, black;
         //Player currentPlayer, opponent;
         //bool whiteTurn = true, turnComplete, check, legalMoveExists;
-        white = new Player(true);
-        black = new Player(false);
+        white = new ComputerPlayer(true, new string[] {"B1A3", "A3B1", "B1A3", "A3B1", "B1A3"});
+        black = new ComputerPlayer(false, new string[] {"B8A6", "A6B8", "B8A6", "A6B8"});
         chessBoard = new ChessBoard(white, black);
         /*
         InitializeBoard(chessBoard, black, white);
@@ -70,25 +70,38 @@ class Program
         Knight knight = new Knight(white);
         King whiteKing = new King(white);
         King blackKing = new King(black);
-        AddPieceToGame(whiteKing, 0, 4, chessBoard);
-        AddPieceToGame(blackKing, 7, 4, chessBoard);
-        AddPieceToGame(knight, 0, 0, chessBoard);
+        //AddPieceToGame(whiteKing, 0, 4, chessBoard);
+        //AddPieceToGame(blackKing, 7, 4, chessBoard);
+        //AddPieceToGame(knight, 0, 0, chessBoard);
         //AddPieceToGame(new Rook(white), 0, 7, chessBoard);
-        AddPieceToGame(new Rook(black), 1, 2, chessBoard);
+        //AddPieceToGame(new Rook(black), 1, 2, chessBoard);
         //AddPieceToGame(new Rook(black), 7, 7, chessBoard);
         //AddPieceToGame(wp, 6, 0, chessBoard);
+        InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
-        Console.WriteLine(chessBoard.IsDeadPosition());
+        bool whiteTurn = true;
+        ComputerPlayer current = whiteTurn? (ComputerPlayer)white : (ComputerPlayer)black;
+        PlayerMove? move;
+        do
+        {
+            move = current.GetNextMove();
+            if (move == null) break;
+            chessBoard.MakeMove(move, whiteTurn);
+            Console.WriteLine(chessBoard);
+            
+            whiteTurn = !whiteTurn;
+            Console.WriteLine(chessBoard.IsThreefoldRepetition(whiteTurn));
+            current = whiteTurn? (ComputerPlayer)white : (ComputerPlayer)black;
+        } while (true);
+        //Console.WriteLine(chessBoard.ToStateEncoding(true));
         //Console.WriteLine(black.IsCastlingPossible(chessBoard));
         //AddPieceToGame(new Bishop(black), 2, 7, chessBoard);
         //AddPieceToGame(king, 0, 5, chessBoard);
         //chessBoard.PlacePiece(new Pawn(black), 2, 2);
         //chessBoard.PlacePiece(new Pawn(white), 6, 2);
-        PlayerMove move = new PlayerMove(0, 0, 1, 2);
-        //Console.WriteLine(black.IsCastlingPossible(chessBoard, move));
-        chessBoard.MakeMove(move);
-        Console.WriteLine(chessBoard);
-        Console.WriteLine(chessBoard.IsDeadPosition());
+        
+        //Console.WriteLine(chessBoard);
+        //Console.WriteLine(chessBoard.IsDeadPosition());
         //CheckForPromotion(move, chessBoard);
         //Console.WriteLine(chessBoard);
         //Console.WriteLine(white.IsInCheck(chessBoard));
@@ -349,6 +362,10 @@ class ChessPiece
     {
         return false;
     }
+    public virtual string ToStateEncoding()
+    {
+        return ToString();
+    }
     
     protected bool HasLegalMovesAlongPath(int startRow, int startCol, int rowStep, int colStep, ChessBoard chessBoard)
     {
@@ -501,6 +518,16 @@ class Pawn : ChessPiece
         if (valid && IsLegalMove(move, chessBoard) && !chessBoard.IsSelfCheck(move, GetPlayer())) return true;
         return false;
     }
+
+    public override string ToStateEncoding()
+    {
+        string result = ToString();
+        if (moveCount == 0)
+            result += "2";
+        if (enPassantPossible)
+            result += "ep";
+        return result;
+    }
 }
 class Rook : ChessPiece
 {
@@ -543,6 +570,13 @@ class Rook : ChessPiece
     public bool IsCastlingPossible()
     {
         return moveCount == 0;
+    }
+    public override string ToStateEncoding()
+    {
+        string result = ToString();
+        if (IsCastlingPossible())
+            result += "c";
+        return result;
     }
 }
 class Bishop : ChessPiece
@@ -685,6 +719,14 @@ class King : ChessPiece
     {
         return moveCount == 0;
     }
+
+    public override string ToStateEncoding()
+    {
+        string result = ToString();
+        if (IsCastlingPossible())
+            result += "c";
+        return result;
+    }
 }
 class ChessBoard
 {
@@ -693,6 +735,7 @@ class ChessBoard
     ChessPiece? endPosition, capturedPiece;
     int fiftyMoveCounter;
     int captureCount;
+    string history;
     public ChessBoard(Player whitePlayer, Player blackPlayer)
     {
         board = new ChessPiece[8, 8];
@@ -700,6 +743,7 @@ class ChessBoard
         this.blackPlayer = blackPlayer;
         fiftyMoveCounter = 0;
         captureCount = 0;
+        history = "";
     }
     public bool PlacePiece(ChessPiece piece, int row, int column)
     {
@@ -751,8 +795,9 @@ class ChessBoard
     {
         return blackPlayer;
     }
-    public bool MakeMove(PlayerMove move)
+    public bool MakeMove(PlayerMove move, bool white)
     {
+        string stateEncoding = ToStateEncoding(white);
         bool result = Update(move);
         if (!result) return false;
         ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
@@ -762,11 +807,29 @@ class ChessBoard
             fiftyMoveCounter = 0;
         else
             fiftyMoveCounter++;
+        if (history == "")
+            history = stateEncoding;
+        else
+            history = stateEncoding + "|" + history;
         return true;
     }
     public bool FiftyMoveRule()
     {
         return fiftyMoveCounter >= 50;
+    }
+    public bool IsThreefoldRepetition(bool white)
+    {
+        string[] pastStates = history.Split('|');
+        string currentState = ToStateEncoding(white);
+        int repetition = 0;
+        foreach (string state in pastStates)
+        {
+            if (currentState == state)
+                repetition++;
+            if (repetition >= 2)
+                return true;
+        }
+        return false;
     }
     public bool Update(PlayerMove move)
     {
@@ -877,6 +940,27 @@ class ChessBoard
                 result += square;
             }
             result += '\n';
+        }
+        return result;
+    }
+
+    public string ToStateEncoding(bool white)
+    {
+        string result = white? "w" : "b";
+        for (int row = 0; row < 8; row++)
+        {
+            for (int col = 0; col < 8; col++)
+            {
+                ChessPiece? piece = board[row, col];
+                if (piece != null && !piece.IsCaptured())
+                {
+                    result += piece.ToStateEncoding();
+                }
+                else
+                {
+                    result += "_";
+                }
+            }
         }
         return result;
     }
