@@ -69,15 +69,19 @@ class Program
         Queen queen = new Queen(black);
         Knight knight = new Knight(white);
         King king = new King(white);
-        AddPieceToGame(knight, 3, 6, chessBoard);
-        AddPieceToGame(queen, 2, 4, chessBoard);
-        AddPieceToGame(new Bishop(black), 2, 7, chessBoard);
-        AddPieceToGame(king, 0, 5, chessBoard);
+        AddPieceToGame(bp, 1, 6, chessBoard);
+        AddPieceToGame(wp, 6, 4, chessBoard);
+        //AddPieceToGame(new Bishop(black), 2, 7, chessBoard);
+        //AddPieceToGame(king, 0, 5, chessBoard);
         //chessBoard.PlacePiece(new Pawn(black), 2, 2);
         //chessBoard.PlacePiece(new Pawn(white), 6, 2);
+        PlayerMove move = new PlayerMove(1, 6, 0, 6);
+        chessBoard.MakeMove(move);
         Console.WriteLine(chessBoard);
-        Console.WriteLine(white.IsInCheck(chessBoard));
-        Console.WriteLine(white.HasLegalMoves(chessBoard));
+        CheckForPromotion(move, chessBoard);
+        Console.WriteLine(chessBoard);
+        //Console.WriteLine(white.IsInCheck(chessBoard));
+        //Console.WriteLine(white.HasLegalMoves(chessBoard));
         /*
         chessBoard.Update(new PlayerMove(2, 3, 4, 3));
         Console.WriteLine(chessBoard);
@@ -228,6 +232,34 @@ class Program
         chessBoard.PlacePiece(piece, row, column);
         piece.GetPlayer().AddPiece(piece);
     }
+    static void CheckForPromotion(PlayerMove move, ChessBoard chessBoard)
+    {
+        ChessPiece? movedPiece = chessBoard.GetPiece(move.GetEndRow(), move.GetEndColumn());
+        if (movedPiece is Pawn)
+        {
+            int lastRank = movedPiece.GetPlayer().IsWhite()? 7 : 0;
+            if (movedPiece.GetCurrentRow() == lastRank)
+            {
+                Pawn pawnToPromote = (Pawn)movedPiece;
+                string? input;
+                bool success = true;
+                
+                do
+                {
+                    if (!success)
+                        Console.WriteLine("Invalid input!");
+                    Console.WriteLine("Pawn has reached last rank. Please promote the pawn.");
+                    Console.WriteLine("Please enter the desired promotion (R for rook, B for bishop, N for knight, Q for queen):");
+                    input = Console.ReadLine();
+                    if (input != null && input.Trim().Length >= 1)
+                        success = pawnToPromote.Promote(input.Trim()[0], chessBoard);
+                    else
+                        success = false;
+                } while (!success);
+
+            }
+        }
+    }
 }
 
 class ChessPiece
@@ -236,6 +268,7 @@ class ChessPiece
     protected int currentColumn;
     Player player;
     bool captured;
+    protected int indexForPlayer;
     public ChessPiece(Player player, int currentRow, int currentColumn) : this(player)
     {
         SetCurrentRow(currentRow);
@@ -245,6 +278,13 @@ class ChessPiece
     {
         this.player = player;
         SetCaptured(false);
+        SetIndexForPlayer(0);
+    }
+    public bool SetIndexForPlayer(int indexForPlayer)
+    {
+        if (indexForPlayer < 0 || indexForPlayer >= 16) return false;
+        this.indexForPlayer = indexForPlayer;
+        return true;
     }
     public bool SetCurrentRow(int currentRow)
     {
@@ -327,6 +367,36 @@ class Pawn : ChessPiece
         enPassantPossible = false;
         enPassantFlag = false;
         moveCount = 0;
+    }
+    public bool Promote(char promoteTo, ChessBoard chessBoard)
+    {
+        ChessPiece? promotion;
+        switch (promoteTo)
+        {
+            case 'Q': case 'q':
+                promotion = new Queen(GetPlayer());
+                break;
+            case 'R': case 'r':
+                promotion = new Rook(GetPlayer(), moveCount);
+                break;
+            case 'B': case 'b':
+                promotion = new Bishop(GetPlayer());
+                break;
+            case 'N': case 'n':
+                promotion = new Knight(GetPlayer());
+                break;
+            default:
+                return false;
+        }
+        bool success = chessBoard.PlacePiece(promotion, currentRow, currentColumn);
+        if (!success) return false;
+        success = GetPlayer().ChangePiece(indexForPlayer, promotion);
+        if (!success)
+        {
+            chessBoard.PlacePiece(this, currentRow, currentColumn);
+            return false;
+        }
+        return true;
     }
     public bool IsEnPassantPossible()
     {
@@ -721,6 +791,7 @@ class ChessBoard
         if (capturedPiece != null)
             capturedPiece.SetCaptured(false);
     }
+    
     public override string ToString()
     {
         
@@ -804,10 +875,18 @@ class Player
         if (pieceCount < 16)
         {
             pieces[pieceCount] = piece;
+            piece.SetIndexForPlayer(pieceCount);
             if (piece is King)
                 kingIndex = pieceCount;
             pieceCount++;
         }
+    }
+    public bool ChangePiece(int index, ChessPiece piece)
+    {
+        if (index >= pieceCount || index < 0)
+            return false;
+        pieces[index] = piece;
+        return true;
     }
     public override bool Equals(object? obj)
     {
