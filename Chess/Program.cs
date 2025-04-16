@@ -5,13 +5,15 @@ class Program
     static void Main(string[] args)
     {
         ChessBoard chessBoard;
-        Player white, black;
-        //Player currentPlayer, opponent;
-        //bool whiteTurn = true, turnComplete, check, legalMoveExists;
-        white = new ComputerPlayer(true, new string[] {"B1A3", "A3B1", "B1A3", "A3B1", "B1A3"});
-        black = new ComputerPlayer(false, new string[] {"B8A6", "A6B8", "B8A6", "A6B8"});
+        Player white, black, comWhite, comBlack;
+        Player currentPlayer, opponent;
+        bool whiteTurn = true, turnComplete, check, legalMoveExists, drawCondition;
+        white = new Player(true);
+        black = new Player(false);
+        comWhite = new ComputerPlayer(true, new string[] {"B1A3", "A3B1", "B1A3", "A3B1", "B1A3"});
+        comBlack = new ComputerPlayer(false, new string[] {"B8A6", "A6B8", "B8A6", "A6B8"});
         chessBoard = new ChessBoard(white, black);
-        /*
+        
         InitializeBoard(chessBoard, black, white);
         Console.WriteLine(chessBoard);
         
@@ -27,21 +29,41 @@ class Program
             if (check && legalMoveExists)
                 Console.WriteLine("Check!");
             whiteTurn = !whiteTurn;
-        } while (turnComplete && legalMoveExists);
+            drawCondition = chessBoard.FiftyMoveRule() || 
+            chessBoard.IsDeadPosition() || chessBoard.IsThreefoldRepetition(whiteTurn);
+        } while (turnComplete && legalMoveExists && !drawCondition);
         if (white.IsDrawRequest() && black.IsDrawRequest())
         {
             Console.WriteLine("The game ends in a draw by agreement!");
         }
-        if (!legalMoveExists)
+        else
         {
-            if (check)
+            if (!legalMoveExists && check)
             {
+                
                 Console.WriteLine("Checkmate!");
                 Console.WriteLine("{0} wins!", currentPlayer);
             }
             else
-                Console.WriteLine("Stalemate!");
+            {
+                if (drawCondition || (!check && !legalMoveExists))
+                {
+                    if (!check && !legalMoveExists)
+                        Console.WriteLine("Stalemate!");
+                    else if (chessBoard.FiftyMoveRule())
+                        Console.WriteLine("Fifty move rule!");
+                    else if (chessBoard.IsDeadPosition())
+                        Console.WriteLine("Board is in dead position!");
+                    else if (chessBoard.IsThreefoldRepetition(whiteTurn))
+                        Console.WriteLine("Threefold repetition!");
+                    Console.WriteLine("The game ends in a draw!");
+                }
+            }
         }
+        
+        
+        
+        
         /*PlayerTurn(white, chessBoard);
         Console.WriteLine(chessBoard);
         PlayerTurn(black, chessBoard);
@@ -62,7 +84,7 @@ class Program
         AddPieceToGame(new Rook(black), 2, 2, chessBoard);
         Console.WriteLine(chessBoard);
         Console.WriteLine(white.IsInCheck(chessBoard));
-        Console.WriteLine(chessBoard.Update(new PlayerMove(0, 0, 1, 1)));*/
+        Console.WriteLine(chessBoard.Update(new PlayerMove(0, 0, 1, 1)));
         
         Pawn bp = new Pawn(black);
         Pawn wp = new Pawn(white);
@@ -182,7 +204,7 @@ class Program
                 Console.WriteLine("Move is illegal for {0}", piece);
                 continue;
             }
-            chessBoard.Update(move);
+            chessBoard.MakeMove(move, player.IsWhite());
             if (player.IsInCheck(chessBoard))
             {
                 chessBoard.Revert(move);
@@ -389,12 +411,14 @@ class Pawn : ChessPiece
     bool enPassantPossible;
     int moveCount;
     bool enPassantFlag;
+    int enPassantTurn;
     
     public Pawn(Player player) : base(player) 
     {
         enPassantPossible = false;
         enPassantFlag = false;
         moveCount = 0;
+        enPassantTurn = 0;
     }
     public bool Promote(char promoteTo, ChessBoard chessBoard)
     {
@@ -428,7 +452,7 @@ class Pawn : ChessPiece
     }
     public bool IsEnPassantPossible()
     {
-        return enPassantPossible;
+        return enPassantPossible && GetPlayer().GetTurnCount() == enPassantTurn;
     }
     public override string ToString()
     {
@@ -480,7 +504,7 @@ class Pawn : ChessPiece
             ChessPiece? adjacentPiece = chessBoard.GetPiece(GetCurrentRow(), move.GetEndColumn());
             if (adjacentPiece is Pawn)
             {
-                return ((Pawn)adjacentPiece).enPassantPossible;
+                return ((Pawn)adjacentPiece).IsEnPassantPossible();
             }
         }
         return false;
@@ -491,6 +515,7 @@ class Pawn : ChessPiece
         {
             enPassantPossible = true;
             enPassantFlag = true;
+            enPassantTurn = GetPlayer().GetTurnCount();
         }
         else
             enPassantPossible = false;
@@ -501,6 +526,8 @@ class Pawn : ChessPiece
     {
         moveCount--;
         enPassantPossible = moveCount == 1 && enPassantFlag;
+        if (move.GetRowDistance() == 2)
+            enPassantFlag = false;
     }
     public override bool HasLegalMoves(ChessBoard chessBoard)
     {
@@ -524,7 +551,7 @@ class Pawn : ChessPiece
         string result = ToString();
         if (moveCount == 0)
             result += "2";
-        if (enPassantPossible)
+        if (IsEnPassantPossible())
             result += "ep";
         return result;
     }
@@ -807,6 +834,8 @@ class ChessBoard
             fiftyMoveCounter = 0;
         else
             fiftyMoveCounter++;
+        Player currentPlayer = white? whitePlayer : blackPlayer;
+        currentPlayer.UpdateTurnCount();
         if (history == "")
             history = stateEncoding;
         else
@@ -972,17 +1001,26 @@ class Player
     int pieceCount;
     bool drawRequest;
     int kingIndex, kingsideRookIndex, queensideRookIndex;
+    int turnCount;
     public Player(bool white)
     {
         this.white = white;
         pieces = new ChessPiece[16];
         pieceCount = 0;
+        turnCount = 0;
         kingIndex = -1;
         kingsideRookIndex = -1;
         queensideRookIndex = -1;
         SetDrawRequest(false);
     }
-    
+    public int GetTurnCount()
+    {
+        return turnCount;
+    }
+    public void UpdateTurnCount()
+    {
+        turnCount++;
+    }
     public bool IsKingOnBoard()
     {
         if (kingIndex == -1) return false;
