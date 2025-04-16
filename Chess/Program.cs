@@ -452,7 +452,7 @@ class Pawn : ChessPiece
     }
     public bool IsEnPassantPossible()
     {
-        return enPassantPossible && GetPlayer().GetTurnCount() == enPassantTurn;
+        return enPassantFlag && GetPlayer().GetTurnCount() == enPassantTurn;
     }
     public override string ToString()
     {
@@ -515,7 +515,7 @@ class Pawn : ChessPiece
         {
             enPassantPossible = true;
             enPassantFlag = true;
-            enPassantTurn = GetPlayer().GetTurnCount();
+            enPassantTurn = GetPlayer().GetTurnCount() + 1;
         }
         else
             enPassantPossible = false;
