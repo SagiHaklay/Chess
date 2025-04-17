@@ -1180,7 +1180,7 @@ class Player
         bool kingside = kingMove.GetEndColumn() > kingMove.GetStartColumn();
         rook = kingside? GetKingsideRook() : GetQueensideRook();
         if (rook == null) return false;
-        if (!rook.IsCastlingPossible()) return false;
+        if (rook.IsCaptured() || !rook.IsCastlingPossible()) return false;
         PlayerMove pathBetween = new PlayerMove(king.GetCurrentRow(), king.GetCurrentColumn(), 
             rook.GetCurrentRow(), rook.GetCurrentColumn());
         if (!pathBetween.IsNonBlockedHorizontal(chessBoard)) return false;
