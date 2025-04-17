@@ -8,21 +8,32 @@ class Program
         Player white, black, comWhite, comBlack;
         Player currentPlayer, opponent;
         bool whiteTurn = true, turnComplete, check, legalMoveExists, drawCondition;
-        white = new Player(true);
-        black = new Player(false);
-        comWhite = new ComputerPlayer(true, new string[] {
+        string[] whiteMoves1 = {
             "C2C4", "B1C3", "C3D5", "G2G3", "F1G2", "G1F3", "E1G1", "C4D5", "F3E1", "D2D3", "C1E3", "D3E4",
             "D1D4", "E1D3", "E2D3", "D4E4", "E4F4", "E3F4", "A1D1", "D1D2", "F4D2", "D2B4", "F1E1", "E1E2",
             "E2D2", "A2B3", "G1F1", "F1E2", "G2H3", "G3G4", "G4G5", "H3E6", "D3D4", "E2D1", "D4C5"
-            });
-        comBlack = new ComputerPlayer(false, new string[] {
+        };
+        string[] blackMoves1 = {
             "E7E5", "F8B4", "A7A5", "G8F6", "D7D6", "E8G8", "F6D5", "E5E4", "C8F5", "D8E7", "B8A6", "F5E4",
             "F8E8", "E4D3", "B4C5", "E7F6", "F6F4", "E8E2", "E2B2", "B2D2", "A6B4", "A5B4", "F7F5", "A8A3",
             "B4B3", "A3B3", "B7B5", "B5B4", "G7G6", "F5F4", "B3A3", "G8G7", "F4F3", "B4B3", "A3A1"
-            });
+        };
+        string[] whiteMoves2 = {
+            "A1A2", "A2A1", "A1A2", "A2A1", "A1A2", "A2A1"
+        };
+        string[] blackMoves2 = {
+            "H8H7", "H7H8", "H8H7", "H7H8", "H8H7", "H7H8"
+        };
+        white = new Player(true);
+        black = new Player(false);
+        comWhite = new ComputerPlayer(true, whiteMoves2);
+        comBlack = new ComputerPlayer(false, blackMoves2);
+        
         chessBoard = new ChessBoard(white, black);
         
         InitializeBoard(chessBoard);
+        //AddPieceToGame(new Rook(comWhite), 0, 0, chessBoard);
+        //AddPieceToGame(new Rook(comBlack), 7, 7, chessBoard);
         
         Console.WriteLine(chessBoard);
         
