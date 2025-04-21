@@ -460,18 +460,18 @@ class ChessGame
     ChessBoard chessBoard;
     Player whitePlayer, blackPlayer;
     bool whiteTurn;
-    int fiftyMoveCounter;
+    int nonCaptureOrPawnMoveCount;
     int captureCount;
-    string history;
+    string gameStateHistory;
     public ChessGame()
     {
         whitePlayer = new Player(true);
         blackPlayer = new Player(false);
         chessBoard = new ChessBoard(whitePlayer, blackPlayer);
         whiteTurn = true;
-        fiftyMoveCounter = 0;
+        nonCaptureOrPawnMoveCount = 0;
         captureCount = 0;
-        history = "";
+        gameStateHistory = "";
     }
     public void Play()
     {
@@ -682,11 +682,11 @@ class ChessGame
     }
     public bool IsFiftyMoveRule()
     {
-        return fiftyMoveCounter >= 50;
+        return nonCaptureOrPawnMoveCount >= 50;
     }
     public bool IsThreefoldRepetition(bool white)
     {
-        string[] pastStates = history.Split('|');
+        string[] pastStates = gameStateHistory.Split('|');
         string currentState = chessBoard.ToStateEncoding(white);
         int repetition = 0;
         foreach (string state in pastStates)
@@ -707,15 +707,15 @@ class ChessGame
         if (chessBoard.CapturedPieceExists())
             captureCount++;
         if (movedPiece is Pawn || chessBoard.CapturedPieceExists())
-            fiftyMoveCounter = 0;
+            nonCaptureOrPawnMoveCount = 0;
         else
-            fiftyMoveCounter++;
+            nonCaptureOrPawnMoveCount++;
         Player currentPlayer = whiteTurn? whitePlayer : blackPlayer;
         currentPlayer.UpdateTurnCount();
-        if (history == "")
-            history = stateEncoding;
+        if (gameStateHistory == "")
+            gameStateHistory = stateEncoding;
         else
-            history = stateEncoding + "|" + history;
+            gameStateHistory = stateEncoding + "|" + gameStateHistory;
         return true;
     }
     public bool IsDeadPosition()
