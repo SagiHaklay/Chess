@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\talpiot\\Chess\\Chess\\Chess.csproj": {}
+    "C:\\talpiot\\Chess\\Chess\\Chess.csproj": {}
   },
   "projects": {
-    "c:\\talpiot\\Chess\\Chess\\Chess.csproj": {
+    "C:\\talpiot\\Chess\\Chess\\Chess.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\talpiot\\Chess\\Chess\\Chess.csproj",
+        "projectUniqueName": "C:\\talpiot\\Chess\\Chess\\Chess.csproj",
         "projectName": "Chess",
-        "projectPath": "c:\\talpiot\\Chess\\Chess\\Chess.csproj",
+        "projectPath": "C:\\talpiot\\Chess\\Chess\\Chess.csproj",
         "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-        "outputPath": "c:\\talpiot\\Chess\\Chess\\obj\\",
+        "outputPath": "C:\\talpiot\\Chess\\Chess\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config"
