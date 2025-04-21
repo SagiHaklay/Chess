@@ -231,19 +231,17 @@ class Pawn : ChessPiece
     {
         if (move.GetRowDistance() == 2)
         {
-            //enPassantPossible = true;
             enPassantFlag = true;
             enPassantTurn = GetPlayer().GetTurnCount() + 1;
         }
-        /*else
-            enPassantPossible = false;*/
+        
         
         moveCount++;
     }
     public override void Revert(PlayerMove move)
     {
         moveCount--;
-        //enPassantPossible = moveCount == 1 && enPassantFlag;
+        
         if (move.GetRowDistance() == 2)
             enPassantFlag = false;
     }
@@ -885,7 +883,7 @@ class ChessBoard
             result += string.Format("{0}  ", row + 1);
             for (int col = 0; col < board.GetLength(1); col++)
             {
-                string square = "  ";
+                string square = "__";
                 ChessPiece? piece = board[row, col];
                 if (piece != null && !piece.IsCaptured())
                 {
@@ -969,15 +967,7 @@ class Player
         if (kingIndex == -1) return false;
         ChessPiece king = pieces[kingIndex];
         Player opponent = white? chessBoard.GetBlackPlayer() : chessBoard.GetWhitePlayer();
-        /*for (int i = 0; i < opponent.pieceCount; i++)
-        {
-            ChessPiece opponentPiece = opponent.pieces[i];
-            if (opponentPiece.IsCaptured()) continue;
-            PlayerMove checkMove = new PlayerMove(opponentPiece.GetCurrentRow(), opponentPiece.GetCurrentColumn(), king.GetCurrentRow(), king.GetCurrentColumn());
-            if (opponentPiece.IsLegalMove(checkMove, chessBoard))
-                return true;
-        }
-        return false;*/
+        
         return opponent.ThreatensPosition(king.GetCurrentRow(), king.GetCurrentColumn(), chessBoard);
     }
     public bool ThreatensPosition(int row, int column, ChessBoard chessBoard)
