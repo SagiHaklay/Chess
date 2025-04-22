@@ -16,7 +16,10 @@ class ChessPiece
     Player player;
     bool captured;
     protected int indexForPlayer;
-    
+    public ChessPiece(Player player, Position position) : this(player)
+    {
+        SetCurrentPosition(position);
+    }
     public ChessPiece(Player player)
     {
         this.player = player;
@@ -37,6 +40,10 @@ class ChessPiece
     public bool SetCurrentColumn(int currentColumn)
     {
         return currentPosition.SetColumn(currentColumn);
+    }
+    public void SetCurrentPosition(Position currentPosition)
+    {
+        this.currentPosition = currentPosition;
     }
     public int GetCurrentRow()
     {
@@ -79,7 +86,7 @@ class ChessPiece
         foreach (Step step in GetPossibleSteps())
         {
             validStep = currentPosition.IsValidStep(step);
-            move = new PlayerMove(currentPosition, currentPosition.AddStep(step));
+            move = new PlayerMove(currentPosition.Copy(), currentPosition.AddStep(step));
             if (validStep && IsLegalMove(move, chessBoard) && 
                 !game.IsSelfCheck(move, GetPlayer()))
                 return true;
@@ -96,37 +103,25 @@ class ChessPiece
         return ToString();
     }
     
-    protected bool HasLegalMovesAlongPath(int startRow, int startCol, int rowStep, int colStep, ChessBoard chessBoard, ChessGame game)
+    protected bool HasLegalMovesAlongPath(Position start, Step step, ChessBoard chessBoard, ChessGame game)
     {
-        for (int row = startRow, col = startCol; row < 8 && row >= 0 && col < 8 && col >= 0; row += rowStep, col += colStep)
+        Position position = start.Copy();
+        bool pathEnded = false;
+        while (!pathEnded)
         {
-            ChessPiece? piece = chessBoard.GetPiece(row, col);
+            ChessPiece? piece = chessBoard.GetPiece(position.GetRow(), position.GetColumn());
             if (piece != null && piece.GetPlayer().Equals(player))
                 break;
-            PlayerMove move = new PlayerMove(GetCurrentRow(), GetCurrentColumn(), row, col);
+            PlayerMove move = new PlayerMove(currentPosition.Copy(), position);
             if (!game.IsSelfCheck(move, player))
                 return true;
-            if (piece != null)
-                break;
+            if (piece != null || !position.IsValidStep(step))
+                pathEnded = true;
+            position = position.AddStep(step);
         }
         return false;
     }
-    protected bool HasHorizontalOrVerticalLegalMoves(ChessBoard chessBoard, ChessGame game)
-    {
-        if (HasLegalMovesAlongPath(GetCurrentRow() + 1, GetCurrentColumn(), 1, 0, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow() - 1, GetCurrentColumn(), -1, 0, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow(), GetCurrentColumn() + 1, 0, 1, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow(), GetCurrentColumn() - 1, 0, -1, chessBoard, game)) return true;
-        return false;
-    }
-    protected bool HasDiagonalLegalMoves(ChessBoard chessBoard, ChessGame game)
-    {
-        if (HasLegalMovesAlongPath(GetCurrentRow() + 1, GetCurrentColumn() + 1, 1, 1, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow() - 1, GetCurrentColumn() + 1, -1, 1, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow() + 1, GetCurrentColumn() - 1, 1, -1, chessBoard, game)) return true;
-        if (HasLegalMovesAlongPath(GetCurrentRow() - 1, GetCurrentColumn() - 1, -1, -1, chessBoard, game)) return true;
-        return false;
-    }
+    
 }
 
 class Pawn : ChessPiece
@@ -276,6 +271,10 @@ class Rook : ChessPiece
     {
 
     }
+    public Rook(Player player, Position position) : this(player, 0)
+    {
+        SetCurrentPosition(position);
+    }
     public Rook(Player player, int moveCount) : base(player)
     {
         this.moveCount = moveCount;
@@ -292,7 +291,12 @@ class Rook : ChessPiece
     }
     public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
     {
-        return HasHorizontalOrVerticalLegalMoves(chessBoard, game);
+        Step up = new Step(1, 0), down = new Step(-1, 0), left = new Step(0, -1), right = new Step(0, 1);
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(up), up, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(down), down, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(right), right, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(left), left, chessBoard, game)) return true;
+        return false;
     }
     public override void UpdateAfterMove(PlayerMove move)
     {
@@ -316,10 +320,11 @@ class Rook : ChessPiece
 }
 class Bishop : ChessPiece
 {
-
-    
     public Bishop(Player player) : base(player) {}
-
+    public Bishop(Player player, Position position) : this(player)
+    {
+        SetCurrentPosition(position);
+    }
     public override string ToString()
     {
         return base.ToString() + "B";
@@ -332,7 +337,13 @@ class Bishop : ChessPiece
 
     public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
     {
-        return HasDiagonalLegalMoves(chessBoard, game);
+        Step upRight = new Step(1, 1), downRight = new Step(-1, 1), 
+            upLeft = new Step(1, -1), downLeft = new Step(-1, -1);
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(upRight), upRight, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(downRight), downRight, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(upLeft), upLeft, chessBoard, game)) return true;
+        if (HasLegalMovesAlongPath(currentPosition.AddStep(downLeft), downLeft, chessBoard, game)) return true;
+        return false;
     }
 }
 class Knight : ChessPiece
@@ -363,9 +374,13 @@ class Knight : ChessPiece
 }
 class Queen : ChessPiece
 {
-
-    
-    public Queen(Player player) : base(player) {}
+    Rook queenAsRook;
+    Bishop queenAsBishop;
+    public Queen(Player player) : base(player) 
+    {
+        queenAsBishop = new Bishop(player, currentPosition);
+        queenAsRook = new Rook(player, currentPosition);
+    }
 
     public override string ToString()
     {
@@ -374,12 +389,22 @@ class Queen : ChessPiece
     public override bool IsLegalMove(PlayerMove move, ChessBoard chessBoard)
     {
         if (!base.IsLegalMove(move, chessBoard)) return false;
-        return move.IsNonBlockedHorizontal(chessBoard) || move.IsNonBlockedVertical(chessBoard) ||
-            move.IsNonBlockedDiagonal(chessBoard);
+        return queenAsRook.IsLegalMove(move, chessBoard) || queenAsBishop.IsLegalMove(move, chessBoard);
     }
     public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
     {
-        return HasHorizontalOrVerticalLegalMoves(chessBoard, game) || HasDiagonalLegalMoves(chessBoard, game);
+        return queenAsRook.HasLegalMoves(chessBoard, game) || queenAsBishop.HasLegalMoves(chessBoard, game);
+    }
+
+    public override void UpdateAfterMove(PlayerMove move)
+    {
+        queenAsRook.SetCurrentPosition(currentPosition);
+        queenAsBishop.SetCurrentPosition(currentPosition);
+    }
+    public override void Revert(PlayerMove move)
+    {
+        queenAsRook.SetCurrentPosition(currentPosition);
+        queenAsBishop.SetCurrentPosition(currentPosition);
     }
 }
 class King : ChessPiece
@@ -1358,6 +1383,10 @@ class Position
         int newRow = row + step.GetRowStep();
         int newCol = column + step.GetColumnStep();
         return new Position(newRow, newCol);
+    }
+    public Position Copy()
+    {
+        return new Position(row, column);
     }
 }
 class Step
