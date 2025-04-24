@@ -30,13 +30,11 @@ class ChessPiece
         this.player = player;
         currentPosition = new Position();
         SetCaptured(false);
-        SetIndexForPlayer(0);
+        SetIndexForPlayer(-1);
     }
-    public bool SetIndexForPlayer(int indexForPlayer)
+    public void SetIndexForPlayer(int indexForPlayer)
     {
-        if (indexForPlayer < 0 || indexForPlayer >= 16) return false;
         this.indexForPlayer = indexForPlayer;
-        return true;
     }
     public bool SetCurrentRow(int currentRow)
     {
@@ -85,7 +83,7 @@ class ChessPiece
         if (captured) return false;
         if (move.IsStationary()) return false;
         ChessPiece endPosition = chessBoard.GetPiece(move.GetEndRow(), move.GetEndColumn());
-        if (!(endPosition is EmptyPiece) && endPosition.GetPlayer().Equals(player)) return false;
+        if (!(endPosition is EmptyPiece) && IsSameColor(endPosition)) return false;
         return true;
     }
     public virtual void UpdateAfterMove(PlayerMove move) {}
@@ -168,34 +166,28 @@ class Pawn : ChessPiece
         moveCount = 0;
         enPassantTurn = 0;
     }
-    public bool Promote(char promoteTo, ChessBoard chessBoard)
+    ChessPiece GetPromotion(char promoteTo)
     {
-        ChessPiece? promotion;
         switch (promoteTo)
         {
             case 'Q': case 'q':
-                promotion = new Queen(GetPlayer());
-                break;
+                return new Queen(GetPlayer());
             case 'R': case 'r':
-                promotion = new Rook(GetPlayer(), moveCount);
-                break;
+                return new Rook(GetPlayer(), moveCount);
             case 'B': case 'b':
-                promotion = new Bishop(GetPlayer());
-                break;
+                return new Bishop(GetPlayer());
             case 'N': case 'n':
-                promotion = new Knight(GetPlayer());
-                break;
+                return new Knight(GetPlayer());
             default:
-                return false;
+                return this;
         }
-        bool success = chessBoard.PlacePiece(promotion, GetCurrentRow(), GetCurrentColumn());
-        if (!success) return false;
-        success = GetPlayer().ChangePiece(indexForPlayer, promotion);
-        if (!success)
-        {
-            chessBoard.PlacePiece(this, GetCurrentRow(), GetCurrentColumn());
-            return false;
-        }
+    }
+    public bool Promote(char promoteTo, ChessBoard chessBoard)
+    {
+        ChessPiece promotion = GetPromotion(promoteTo);
+        if (promotion is Pawn) return false;
+        chessBoard.PlacePiece(promotion, GetCurrentRow(), GetCurrentColumn());
+        GetPlayer().ChangePiece(indexForPlayer, promotion);
         return true;
     }
     public bool IsEnPassantTarget()
@@ -210,24 +202,32 @@ class Pawn : ChessPiece
     public bool IsCapturingMove(PlayerMove move, ChessBoard chessBoard)
     {
         if (!base.IsLegalMove(move, chessBoard)) return false;
-        int rowDiff = move.GetEndRow() - move.GetStartRow();
-        // check if move direction is backwards
-        if (GetPlayer().IsWhite() != (rowDiff > 0))
-            return false;
+        if(!IsForward(move, chessBoard)) return false;
         if (!move.IsDiagonal()) return false;
         // check path distance is 1
         if (move.GetColumnDistance() != 1)
             return false;
         return true;
     }
+    bool IsForward(PlayerMove move, ChessBoard chessBoard)
+    {
+        int rowDiff = move.GetEndRow() - move.GetStartRow();
+        // check if move direction is backwards
+        return GetPlayer().IsWhite() == (rowDiff > 0);
+    }
+    bool CanCaptureEnPassant(PlayerMove move, ChessBoard chessBoard)
+    {
+        ChessPiece adjacentPiece = chessBoard.GetPiece(GetCurrentRow(), move.GetEndColumn());
+        if (adjacentPiece is Pawn)
+        {
+            return ((Pawn)adjacentPiece).IsEnPassantTarget();
+        }
+        return false;
+    }
     public override bool IsLegalMove(PlayerMove move, ChessBoard chessBoard)
     {
         if (!base.IsLegalMove(move, chessBoard)) return false;
-        int rowDiff = move.GetEndRow() - move.GetStartRow();
-        // check if move direction is backwards
-        if (GetPlayer().IsWhite() != (rowDiff > 0))
-            return false;
-        // move direction is forward
+        if(!IsForward(move, chessBoard)) return false;
         ChessPiece endPosition = chessBoard.GetPiece(move.GetEndRow(), move.GetEndColumn());
         if (move.IsNonBlockedVertical(chessBoard))
         {
@@ -239,20 +239,11 @@ class Pawn : ChessPiece
         }
         if (move.IsDiagonal())
         {
-            // check path distance is 1
-            if (move.GetColumnDistance() != 1)
+            if (move.GetColumnDistance() != 1) // check path distance is 1
                 return false;
-            if (!(endPosition is EmptyPiece))
-            {
-                // check capture is possible
+            if (!(endPosition is EmptyPiece)) // check capture is possible
                 return !IsSameColor(endPosition);
-            }
-            // check if en passant is possible
-            ChessPiece? adjacentPiece = chessBoard.GetPiece(GetCurrentRow(), move.GetEndColumn());
-            if (adjacentPiece is Pawn)
-            {
-                return ((Pawn)adjacentPiece).IsEnPassantTarget();
-            }
+            return CanCaptureEnPassant(move, chessBoard); // check if en passant is possible
         }
         return false;
     }
@@ -317,7 +308,7 @@ class Rook : ChessPiece
         if (!base.IsLegalMove(move, chessBoard)) return false;
         return move.IsNonBlockedHorizontal(chessBoard) || move.IsNonBlockedVertical(chessBoard);
     }
-    public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
+    /*public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
     {
         Step up = new Step(1, 0), down = new Step(-1, 0), left = new Step(0, -1), right = new Step(0, 1);
         if (HasLegalMovesAlongPath(currentPosition.AddStep(up), up, chessBoard, game)) return true;
@@ -325,7 +316,7 @@ class Rook : ChessPiece
         if (HasLegalMovesAlongPath(currentPosition.AddStep(right), right, chessBoard, game)) return true;
         if (HasLegalMovesAlongPath(currentPosition.AddStep(left), left, chessBoard, game)) return true;
         return false;
-    }
+    }*/
     public override void UpdateAfterMove(PlayerMove move)
     {
         moveCount++;
@@ -346,6 +337,22 @@ class Rook : ChessPiece
             result += "c";
         return result;
     }
+    public override Step[] GetPossibleSteps()
+    {
+        Step[] steps = new Step[28];
+        int lastIndex = 0;
+        for (int i = -7; i <= 7; i++)
+        {
+            if (i != 0)
+            {
+                steps[lastIndex] = new Step(i, 0);
+                lastIndex++;
+                steps[lastIndex] = new Step(0, i);
+                lastIndex++;
+            }
+        }
+        return steps;
+    }
 }
 class Bishop : ChessPiece
 {
@@ -364,7 +371,7 @@ class Bishop : ChessPiece
         if (!base.IsLegalMove(move, chessBoard)) return false;
         return move.IsNonBlockedDiagonal(chessBoard);
     }
-    public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
+    /*public override bool HasLegalMoves(ChessBoard chessBoard, ChessGame game)
     {
         Step upRight = new Step(1, 1), downRight = new Step(-1, 1), 
             upLeft = new Step(1, -1), downLeft = new Step(-1, -1);
@@ -373,6 +380,22 @@ class Bishop : ChessPiece
         if (HasLegalMovesAlongPath(currentPosition.AddStep(upLeft), upLeft, chessBoard, game)) return true;
         if (HasLegalMovesAlongPath(currentPosition.AddStep(downLeft), downLeft, chessBoard, game)) return true;
         return false;
+    }*/
+    public override Step[] GetPossibleSteps()
+    {
+        Step[] steps = new Step[28];
+        int lastIndex = 0;
+        for (int i = -7; i <= 7; i++)
+        {
+            if (i != 0)
+            {
+                steps[lastIndex] = new Step(i, i);
+                lastIndex++;
+                steps[lastIndex] = new Step(i, -i);
+                lastIndex++;
+            }
+        }
+        return steps;
     }
 }
 class Knight : ChessPiece
@@ -532,7 +555,6 @@ class ChessGame
             legalMoveExists = opponent.HasLegalMoves(chessBoard, this);
             if (check && legalMoveExists)
                 Console.WriteLine("Check!");
-            
             drawCondition = IsFiftyMoveRule() || 
             IsDeadPosition() || IsThreefoldRepetition();
         } while (legalMoveExists && !drawCondition);
@@ -622,8 +644,6 @@ class ChessGame
     }
     PlayerMove? GetUserInput(Player player, bool activeDrawRequest)
     {
-        string? input;
-        string userInput;
         PlayerMove? move = null;
         bool invalid = false;
         while (move == null)
@@ -631,8 +651,8 @@ class ChessGame
             if (invalid)
                 Console.WriteLine("Invalid move format!");
             Console.WriteLine("{0} please enter a move:", player);
-            input = Console.ReadLine();
-            userInput = input != null? input.Trim() : "";
+            string? input = Console.ReadLine();
+            string userInput = input != null? input.Trim() : "";
             if (userInput == "DRAW" && !player.IsDrawRequest())
             {
                 player.SetDrawRequest(true);
@@ -644,7 +664,6 @@ class ChessGame
                 Console.WriteLine("{0} requests a draw!", player);
                 return null;
             }
-                
             move = PlayerMove.FromString(userInput);
             invalid = move == null;
         }
@@ -708,7 +727,6 @@ class ChessGame
                         success = false;
                 } while (!success);
                 Console.WriteLine("Pawn has been promoted!");
-                
             }
         }
     }
@@ -824,7 +842,6 @@ class ChessBoard
             board[startRow, startColumn] = piece;
             return false;
         }
-        
         return true;
     }
     public bool MovePiece(PlayerMove move)
@@ -843,34 +860,26 @@ class ChessBoard
     {
         endPosition = GetPiece(move.GetEndRow(), move.GetEndColumn());
         capturedPiece = endPosition;
-        
         bool canMove = MovePiece(move);
-        
         if (canMove)
         {
-            
             ChessPiece movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
             movedPiece.UpdateAfterMove(move);
             // check if move is en passant
-            if (movedPiece is Pawn && move.IsDiagonal() && endPosition == null)
-            {
-                ChessPiece? adjacent = GetPiece(move.GetStartRow(), move.GetEndColumn());
-                if (adjacent is Pawn && ((Pawn)adjacent).IsEnPassantTarget())
-                    capturedPiece = adjacent;
-            }
+            if (movedPiece is Pawn && move.IsDiagonal() && endPosition is EmptyPiece)
+                capturedPiece = GetPiece(move.GetStartRow(), move.GetEndColumn());
             // check if move is castling
             if (movedPiece is King && move.GetColumnDistance() == 2 && move.GetRowDistance() == 0)
             {
                 bool kingside = move.GetEndColumn() > move.GetStartColumn();
-                Rook? rook = kingside? movedPiece.GetPlayer().GetKingsideRook() : movedPiece.GetPlayer().GetQueensideRook();
-                if (rook == null) return false;
+                ChessPiece rook = movedPiece.GetPlayer().GetRook(kingside);
+                if (rook is EmptyPiece) return false;
                 int rookEndColumn = kingside? move.GetEndColumn() - 1 : move.GetEndColumn() + 1;
                 PlayerMove rookMove = new PlayerMove(rook.GetCurrentRow(), rook.GetCurrentColumn(), rook.GetCurrentRow(), rookEndColumn);
                 MovePiece(rookMove);
                 rook.UpdateAfterMove(rookMove);
             }
             capturedPiece.SetCaptured(true);
-            
             return true;
         }
         return false;
@@ -884,9 +893,9 @@ class ChessBoard
         {
             // revert castling
             bool kingside = move.GetEndColumn() > move.GetStartColumn();
-            Rook? rook = kingside? movedPiece.GetPlayer().GetKingsideRook() : movedPiece.GetPlayer().GetQueensideRook();
+            ChessPiece rook = movedPiece.GetPlayer().GetRook(kingside);
             int rookColumn = kingside? 7 : 0;
-            if (rook != null)
+            if (rook is Rook)
             {
                 PlacePiece(rook, rook.GetCurrentRow(), rookColumn);
                 rook.Revert(new PlayerMove(rook.GetCurrentRow(), rookColumn, rook.GetCurrentRow(), rook.GetCurrentColumn()));
@@ -972,7 +981,6 @@ class Player
         if (kingIndex == -1) return false;
         ChessPiece king = pieces[kingIndex];
         Player opponent = white? chessBoard.GetBlackPlayer() : chessBoard.GetWhitePlayer();
-        
         return opponent.ThreatensPosition(king.GetCurrentRow(), king.GetCurrentColumn(), chessBoard);
     }
     public bool ThreatensPosition(int row, int column, ChessBoard chessBoard)
@@ -1043,15 +1051,19 @@ class Player
         pieces[index] = piece;
         return true;
     }
-    public Rook? GetKingsideRook()
+    public ChessPiece GetKingsideRook()
     {
-        if (kingsideRookIndex == -1) return null;
-        return (Rook)pieces[kingsideRookIndex];
+        if (kingsideRookIndex == -1) return new EmptyPiece();
+        return pieces[kingsideRookIndex];
     }
-    public Rook? GetQueensideRook()
+    public ChessPiece GetQueensideRook()
     {
-        if (queensideRookIndex == -1) return null;
-        return (Rook)pieces[queensideRookIndex];
+        if (queensideRookIndex == -1) return new EmptyPiece();
+        return pieces[queensideRookIndex];
+    }
+    public ChessPiece GetRook(bool kingside)
+    {
+        return kingside? GetKingsideRook() : GetQueensideRook();
     }
     public bool IsCastlingPossible(ChessBoard chessBoard)
     {
@@ -1066,11 +1078,10 @@ class Player
         if (kingIndex == -1) return false;
         King king = (King)pieces[kingIndex];
         if (!king.IsCastlingPossible()) return false;
-        Rook? rook;
         bool kingside = kingMove.GetEndColumn() > kingMove.GetStartColumn();
-        rook = kingside? GetKingsideRook() : GetQueensideRook();
-        if (rook == null) return false;
-        if (rook.IsCaptured() || !rook.IsCastlingPossible()) return false;
+        ChessPiece rook = GetRook(kingside);
+        if (rook is EmptyPiece) return false;
+        if (rook.IsCaptured() || !((Rook)rook).IsCastlingPossible()) return false;
         PlayerMove pathBetween = new PlayerMove(king.GetCurrentRow(), king.GetCurrentColumn(), 
             rook.GetCurrentRow(), rook.GetCurrentColumn());
         if (!pathBetween.IsNonBlockedHorizontal(chessBoard)) return false;
