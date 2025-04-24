@@ -111,24 +111,7 @@ class ChessPiece
         if (captured) return "_";
         return ToString();
     }
-    protected bool HasLegalMovesAlongPath(Position start, Step step, ChessGame game)
-    {
-        Position position = start.Copy();
-        bool pathEnded = false;
-        while (!pathEnded)
-        {
-            ChessPiece piece = game.GetPiece(position.GetRow(), position.GetColumn());
-            if (!(piece is EmptyPiece) && piece.GetPlayer().Equals(player))
-                break;
-            PlayerMove move = new PlayerMove(currentPosition.Copy(), position);
-            if (!game.IsSelfCheck(move, player))
-                return true;
-            if (!(piece is EmptyPiece) || !position.IsValidStep(step))
-                pathEnded = true;
-            position = position.AddStep(step);
-        }
-        return false;
-    }
+    
 }
 class EmptyPiece : ChessPiece
 {
@@ -504,9 +487,9 @@ class ChessGame
     Player whitePlayer, blackPlayer;
     bool whiteTurn;
     int nonCaptureOrPawnMoveCount;
-    int captureCount;
     string gameStateHistory;
     ChessPiece endPosition, capturedPiece;
+    int onBoardCount;
     public ChessGame()
     {
         whitePlayer = new Player(true);
@@ -517,10 +500,10 @@ class ChessGame
                 board[row, col] = new EmptyPiece();
         whiteTurn = true;
         nonCaptureOrPawnMoveCount = 0;
-        captureCount = 0;
         gameStateHistory = "";
         endPosition = new EmptyPiece();
         capturedPiece = new EmptyPiece();
+        onBoardCount = 0;
     }
     void PrintBoard()
     {
@@ -529,19 +512,18 @@ class ChessGame
     public void Play()
     {
         Player currentPlayer, opponent;
-        bool turnComplete, check = false, legalMoveExists = true, drawCondition = false;
+        bool check = false, legalMoveExists = true, drawCondition = false;
         InitializeBoard();
         PrintBoard();
         do
         {
             currentPlayer = whiteTurn? whitePlayer : blackPlayer;
             opponent = whiteTurn? blackPlayer : whitePlayer;
-            currentPlayer.SetDrawRequest(false);
-            turnComplete = ExecutePlayerTurn(currentPlayer, opponent.IsDrawRequest());
+            ExecutePlayerTurn(currentPlayer, opponent.IsDrawRequest());
             whiteTurn = !whiteTurn;
-            if (!turnComplete)
+            if (currentPlayer.IsDrawRequest())
             {
-                if (currentPlayer.IsDrawRequest() && !opponent.IsDrawRequest())
+                if (!opponent.IsDrawRequest())
                     continue;
                 break;
             }
@@ -550,118 +532,98 @@ class ChessGame
             legalMoveExists = opponent.HasLegalMoves(this);
             if (check && legalMoveExists)
                 Console.WriteLine("Check!");
-            drawCondition = IsFiftyMoveRule() || 
-            IsDeadPosition() || IsThreefoldRepetition();
+            drawCondition = IsFiftyMoveRule() || IsDeadPosition() || IsThreefoldRepetition();
         } while (legalMoveExists && !drawCondition);
-        if (currentPlayer.IsDrawRequest() && opponent.IsDrawRequest())
+        if (!legalMoveExists && check)
         {
-            Console.WriteLine("The game ends in a draw by agreement!");
+            Console.WriteLine("Checkmate!");
+            Console.WriteLine("{0} wins!", currentPlayer);
         }
         else
         {
-            if (!legalMoveExists && check)
-            {
-                
-                Console.WriteLine("Checkmate!");
-                Console.WriteLine("{0} wins!", currentPlayer);
-            }
-            else
-            {
-                if (drawCondition || (!check && !legalMoveExists))
-                {
-                    if (!check && !legalMoveExists)
-                        Console.WriteLine("Stalemate!");
-                    if (IsFiftyMoveRule())
-                        Console.WriteLine("Fifty move rule!");
-                    if (IsDeadPosition())
-                        Console.WriteLine("Board is in dead position!");
-                    if (IsThreefoldRepetition())
-                        Console.WriteLine("Threefold repetition!");
-                    Console.WriteLine("The game ends in a draw!");
-                }
-            }
+            EndGameInDraw();
         }
     }
-    bool ExecutePlayerTurn(Player player, bool activeDrawRequest)
+    void EndGameInDraw()
     {
-        bool legalMove = false;
-        PlayerMove? move;
-        while (!legalMove)
+        if (whitePlayer.IsDrawRequest() && blackPlayer.IsDrawRequest())
+            Console.WriteLine("The game ends in a draw by agreement!");
+        else if (IsFiftyMoveRule())
+            Console.WriteLine("Fifty move rule!");
+        else if (IsDeadPosition())
+            Console.WriteLine("Board is in dead position!");
+        else if (IsThreefoldRepetition())
+            Console.WriteLine("Threefold repetition!");
+        else
+            Console.WriteLine("Stalemate!");
+        Console.WriteLine("The game ends in a draw!");
+    }
+    void ExecutePlayerTurn(Player player, bool activeDrawRequest)
+    {
+        player.SetDrawRequest(false);
+        PlayerMove move = GetUserInput(player, activeDrawRequest);
+        MakeMove(move);
+        if (IsPromotionRequired(move))
+            PromotePawn(move);
+    }
+    bool IsMoveLegal(PlayerMove move, Player player)
+    {
+        if (move.IsStationary())
         {
-            move = player is ComputerPlayer? ((ComputerPlayer)player).GetNextMove() : GetUserInput(player, activeDrawRequest);
-            if (move == null)
-                return false;
-            if (move.GetStartRow() == move.GetEndRow() && move.GetStartColumn() == move.GetEndColumn())
-            {
-                Console.WriteLine("Start position is identical to end position!");
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            ChessPiece piece = GetPiece(move.GetStartRow(), move.GetStartColumn());
-            if (piece is EmptyPiece)
-            {
-                Console.WriteLine("No piece to move!");
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            if (!piece.GetPlayer().Equals(player))
-            {
-                Console.WriteLine("{0} cannot move {1}'s piece!", player, piece.GetPlayer());
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            // Is end position occupied by piece of the same color
-            ChessPiece endPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
-            if (endPiece.IsSameColor(piece))
-            {
-                Console.WriteLine("{0} cannot move to a position occupied by one of {0}'s pieces!", player);
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            // is move legal
-            if (!piece.IsLegalMove(move, this))
-            {
-                Console.WriteLine("Move is illegal for {0}", piece);
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            if (IsSelfCheck(move, player))
-            {
-                Console.WriteLine("Move places {0} in check!", player);
-                if (player is ComputerPlayer) return false;
-                continue;
-            }
-            MakeMove(move);
-            CheckForPromotion(move);
-            legalMove = true;
+            Console.WriteLine("Start position is identical to end position!");
+            return false;
+        }
+        ChessPiece piece = GetPiece(move.GetStartRow(), move.GetStartColumn());
+        if (piece is EmptyPiece)
+        {
+            Console.WriteLine("No piece to move!");
+            return false;
+        }
+        if (!piece.GetPlayer().Equals(player))
+        {
+            Console.WriteLine("{0} cannot move {1}'s piece!", player, piece.GetPlayer());
+            return false;
+        }
+        // is move legal
+        if (!piece.IsLegalMove(move, this))
+        {
+            Console.WriteLine("Move is illegal for {0}", piece);
+            return false;
+        }
+        if (IsSelfCheck(move, player))
+        {
+            Console.WriteLine("Move places {0} in check!", player);
+            return false;
         }
         return true;
     }
-    PlayerMove? GetUserInput(Player player, bool activeDrawRequest)
+    PlayerMove GetUserInput(Player player, bool activeDrawRequest)
     {
-        PlayerMove? move = null;
+        PlayerMove move;
         bool invalid = false;
-        while (move == null)
+        do
         {
             if (invalid)
                 Console.WriteLine("Invalid move format!");
             Console.WriteLine("{0} please enter a move:", player);
             string? input = Console.ReadLine();
             string userInput = input != null? input.Trim() : "";
-            if (userInput == "DRAW" && !player.IsDrawRequest())
+            move = PlayerMove.FromString(userInput);
+            if (move.IsDrawRequest() && !player.IsDrawRequest())
             {
                 player.SetDrawRequest(true);
                 if (activeDrawRequest)
                 {
                     Console.WriteLine("{0} agrees to a draw!", player);
-                    return null;
+                    return move;
                 }
                 Console.WriteLine("{0} requests a draw!", player);
-                return null;
+                return move;
             }
-            move = PlayerMove.FromString(userInput);
-            invalid = move == null;
+            
+            invalid = !move.IsValid();
         }
+        while (invalid || !IsMoveLegal(move, player));
         return move;
     }
     
@@ -693,35 +655,34 @@ class ChessGame
     {
         PlacePiece(piece, row, column);
         piece.GetPlayer().AddPiece(piece);
+        onBoardCount++;
     }
-    void CheckForPromotion(PlayerMove move)
+    bool IsPromotionRequired(PlayerMove move)
     {
-        ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
-        if (movedPiece is Pawn)
-        {
-            int lastRank = movedPiece.GetPlayer().IsWhite()? 7 : 0;
-            if (movedPiece.GetCurrentRow() == lastRank)
-            {
-                Pawn pawnToPromote = (Pawn)movedPiece;
-                string? input;
-                bool success = true;
-                PrintBoard();
-                do
-                {
-                    if (!success)
-                        Console.WriteLine("Invalid input!");
-                    Console.WriteLine("Pawn has reached last rank. Please promote the pawn.");
-                    Console.WriteLine("Please enter the desired promotion (R for rook, B for bishop, N for knight, Q for queen):");
-                    input = Console.ReadLine();
-                    if (input != null && input.Trim().Length >= 1)
-                        success = pawnToPromote.Promote(input.Trim()[0], this);
-                    else
-                        success = false;
-                } while (!success);
-                Console.WriteLine("Pawn has been promoted!");
-            }
-        }
+        ChessPiece movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
+        int lastRank = movedPiece.GetPlayer().IsWhite()? 7 : 0;
+        return movedPiece is Pawn && movedPiece.GetCurrentRow() == lastRank;
     }
+    void PromotePawn(PlayerMove move)
+    {
+        Pawn pawnToPromote = (Pawn)GetPiece(move.GetEndRow(), move.GetEndColumn());
+        bool success = true;
+        PrintBoard();
+        do
+        {
+            if (!success)
+                Console.WriteLine("Invalid input!");
+            Console.WriteLine("Pawn has reached last rank. Please promote the pawn.");
+            Console.WriteLine("Please enter the desired promotion (R for rook, B for bishop, N for knight, Q for queen):");
+            string? input = Console.ReadLine();
+            if (input != null && input.Trim().Length >= 1)
+                success = pawnToPromote.Promote(input.Trim()[0], this);
+            else
+                success = false;
+        } while (!success);
+        Console.WriteLine("Pawn has been promoted!");
+    }
+    
     public bool IsFiftyMoveRule()
     {
         return nonCaptureOrPawnMoveCount >= 50;
@@ -729,7 +690,7 @@ class ChessGame
     public bool IsThreefoldRepetition()
     {
         string[] pastStates = gameStateHistory.Split('|');
-        string currentState = (whiteTurn? "w" : "b") + ToStateEncoding();;
+        string currentState = ToStateEncoding();;
         int repetition = 0;
         foreach (string state in pastStates)
         {
@@ -740,14 +701,13 @@ class ChessGame
         }
         return false;
     }
-    public bool MakeMove(PlayerMove move)
+    public void MakeMove(PlayerMove move)
     {
-        string stateEncoding = (whiteTurn? "w" : "b") + ToStateEncoding();
-        bool result = Update(move);
-        if (!result) return false;
+        string stateEncoding = ToStateEncoding();
+        UpdateBoard(move);
         ChessPiece? movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
         if (CapturedPieceExists())
-            captureCount++;
+            onBoardCount--;
         if (movedPiece is Pawn || CapturedPieceExists())
             nonCaptureOrPawnMoveCount = 0;
         else
@@ -758,11 +718,9 @@ class ChessGame
             gameStateHistory = stateEncoding;
         else
             gameStateHistory = stateEncoding + "|" + gameStateHistory;
-        return true;
     }
     public bool IsDeadPosition()
     {
-        int onBoardCount = whitePlayer.GetPieceCount() + blackPlayer.GetPieceCount() - captureCount;
         if (whitePlayer.IsKingOnBoard() && blackPlayer.IsKingOnBoard())
         {
             if (onBoardCount == 2) return true;
@@ -773,9 +731,9 @@ class ChessGame
     }
     public bool IsSelfCheck(PlayerMove move, Player player)
     {
-        Update(move);
+        UpdateBoard(move);
         bool selfCheck = player.IsInCheck(this);
-        Revert(move);
+        RevertBoard(move);
         return selfCheck;
     }
     public bool CapturedPieceExists()
@@ -830,7 +788,7 @@ class ChessGame
     {
         return blackPlayer;
     }
-    public bool Update(PlayerMove move)
+    public void UpdateBoard(PlayerMove move)
     {
         endPosition = GetPiece(move.GetEndRow(), move.GetEndColumn());
         capturedPiece = endPosition;
@@ -847,18 +805,15 @@ class ChessGame
             {
                 bool kingside = move.GetEndColumn() > move.GetStartColumn();
                 ChessPiece rook = movedPiece.GetPlayer().GetRook(kingside);
-                if (rook is EmptyPiece) return false;
                 int rookEndColumn = kingside? move.GetEndColumn() - 1 : move.GetEndColumn() + 1;
                 PlayerMove rookMove = new PlayerMove(rook.GetCurrentRow(), rook.GetCurrentColumn(), rook.GetCurrentRow(), rookEndColumn);
                 MovePiece(rookMove);
                 rook.UpdateAfterMove(rookMove);
             }
             capturedPiece.SetCaptured(true);
-            return true;
         }
-        return false;
     }
-    public void Revert(PlayerMove move)
+    public void RevertBoard(PlayerMove move)
     {
         ChessPiece movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
         PlacePiece(movedPiece, move.GetStartRow(), move.GetStartColumn());
@@ -895,7 +850,7 @@ class ChessGame
     }
     public string ToStateEncoding()
     {
-        string result = "";
+        string result = whiteTurn? "w" : "b";
         for (int row = 0; row < 8; row++)
         {
             for (int col = 0; col < 8; col++)
@@ -947,10 +902,7 @@ class Player
                 return true;
         return false;
     }
-    public int GetPieceCount()
-    {
-        return pieceCount;
-    }
+    
     public bool IsInCheck(ChessGame game)
     {
         if (kingIndex == -1) return false;
@@ -1087,6 +1039,7 @@ class Player
 class PlayerMove
 {
     Position start, end;
+    bool valid, drawRequest;
     public PlayerMove(int startRow, int startColumn, int endRow, int endColumn)
         : this(new Position(startRow, startColumn), new Position(endRow, endColumn))
     {
@@ -1096,6 +1049,23 @@ class PlayerMove
     {
         this.start = start;
         this.end = end;
+        valid = true;
+        drawRequest = false;
+    }
+    PlayerMove(bool drawRequest) 
+    {
+        start = new Position();
+        end = new Position();
+        this.drawRequest = drawRequest;
+        valid = false;
+    }
+    public bool IsValid()
+    {
+        return valid;
+    }
+    public bool IsDrawRequest()
+    {
+        return drawRequest;
     }
     public bool IsStationary()
     {
@@ -1184,94 +1154,75 @@ class PlayerMove
         return true;
     }
     
-    public static PlayerMove? FromString(string? moveString)
+    public static PlayerMove FromString(string moveString)
     {
-        if (moveString == null)
-            return null;
         if (moveString.Length != 4)
-            return null;
+            return new PlayerMove(false);
+        if (moveString == "DRAW")
+            return new PlayerMove(true);
         int startColumn = CharToColumn(moveString[0]);
         if (startColumn == -1)
-            return null;
+            return new PlayerMove(false);
         int startRow = CharToRow(moveString[1]);
         if (startRow == -1)
-            return null;
+            return new PlayerMove(false);
         int endColumn = CharToColumn(moveString[2]);
         if (endColumn == -1)
-            return null;
+            return new PlayerMove(false);
         int endRow = CharToRow(moveString[3]);
         if (endRow == -1)
-            return null;
+            return new PlayerMove(false);
         return new PlayerMove(startRow, startColumn, endRow, endColumn);
     }
     static int CharToColumn(char letter)
     {
-        int num = -1;
         switch (letter)
         {
             case 'A': case 'a':
-                num = 0;
-                break;
+                return 0;
             case 'B': case 'b':
-                num = 1;
-                break;
+                return 1;
             case 'C': case 'c':
-                num = 2;
-                break;
+                return 2;
             case 'D': case 'd':
-                num = 3;
-                break;
+                return 3;
             case 'E': case 'e':
-                num = 4;
-                break;
+                return 4;
             case 'F': case 'f':
-                num = 5;
-                break;
+                return 5;
             case 'G': case 'g':
-                num = 6;
-                break;
+                return 6;
             case 'H': case 'h':
-                num = 7;
-                break;
+                return 7;
             default:
                 break;
         }
-        return num;
+        return -1;
     }
-    static int CharToRow(char number)
+    static int CharToRow(char digit)
     {
-        int num = -1;
-        
-        switch (number)
+        switch (digit)
         {
             case '1':
-                num = 0;
-                break;
+                return 0;
             case '2':
-                num = 1;
-                break;
+                return 1;
             case '3':
-                num = 2;
-                break;
+                return 2;
             case '4':
-                num = 3;
-                break;
+                return 3;
             case '5':
-                num = 4;
-                break;
+                return 4;
             case '6':
-                num = 5;
-                break;
+                return 5;
             case '7':
-                num = 6;
-                break;
+                return 6;
             case '8':
-                num = 7;
-                break;
+                return 7;
             default:
                 break;
         }
-        return num;
+        return -1;
     }
     
 }
@@ -1354,30 +1305,5 @@ class Step
     public int GetColumnStep()
     {
         return columnStep;
-    }
-}
-class ComputerPlayer : Player
-{
-    int moveIndex;
-    PlayerMove?[] moves;
-    public ComputerPlayer(bool white, PlayerMove[] moves) : base(white) 
-    {
-        this.moves = moves;
-        moveIndex = 0;
-    }
-    public ComputerPlayer(bool white, string[] moveStrings) : base(white)
-    {
-        moves = new PlayerMove[moveStrings.Length];
-        for (int i = 0; i < moveStrings.Length; i++)
-            moves[i] = PlayerMove.FromString(moveStrings[i]);
-        moveIndex = 0;
-    }
-    public PlayerMove? GetNextMove()
-    {
-        if (moveIndex >= moves.Length)
-            return null;
-        PlayerMove? nextMove = moves[moveIndex];
-        moveIndex++;
-        return nextMove;
     }
 }
