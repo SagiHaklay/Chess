@@ -666,6 +666,7 @@ class ChessGame
             GetPawnRow(blackPlayer),
             GetKingRow(blackPlayer)
         };
+        
         for (int row = 0; row < 8; row++)
             for (int col = 0; col < 8; col++)
                 AddPieceToGame(pieces[row][col], row, col);
@@ -674,7 +675,8 @@ class ChessGame
     {
         PlacePiece(piece, row, column);
         piece.GetPlayer().AddPiece(piece);
-        onBoardCount++;
+        if (!(piece is EmptyPiece))
+            onBoardCount++;
     }
     bool IsPromotionRequired(PlayerMove move)
     {
@@ -870,7 +872,7 @@ class ChessGame
         {
             for (int col = 0; col < 8; col++)
             {
-                result += board[row, col];
+                result += board[row, col].ToStateEncoding();
             }
         }
         return result;
