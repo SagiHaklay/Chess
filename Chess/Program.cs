@@ -485,7 +485,7 @@ class ChessGame
 {
     ChessPiece[,] board;
     Player whitePlayer, blackPlayer;
-    bool whiteTurn;
+    bool whiteTurn, check, legalMoveExists;
     int nonCaptureOrPawnMoveCount;
     string gameStateHistory;
     ChessPiece endPosition, capturedPiece;
@@ -495,15 +495,14 @@ class ChessGame
         whitePlayer = new Player(true);
         blackPlayer = new Player(false);
         board = new ChessPiece[8, 8];
-        for (int row = 0; row < 8; row++)
-            for (int col = 0; col < 8; col++)
-                board[row, col] = new EmptyPiece();
         whiteTurn = true;
         nonCaptureOrPawnMoveCount = 0;
         gameStateHistory = "";
         endPosition = new EmptyPiece();
         capturedPiece = new EmptyPiece();
         onBoardCount = 0;
+        check = false;
+        legalMoveExists = true;
     }
     void PrintBoard()
     {
@@ -511,10 +510,14 @@ class ChessGame
     }
     public void Play()
     {
-        Player currentPlayer, opponent;
-        bool check = false, legalMoveExists = true, drawCondition = false;
         InitializeBoard();
         PrintBoard();
+        RunGameLoop();
+    }
+    void RunGameLoop()
+    {
+        Player currentPlayer, opponent;
+        bool drawCondition = false;
         do
         {
             currentPlayer = whiteTurn? whitePlayer : blackPlayer;
@@ -534,15 +537,17 @@ class ChessGame
                 Console.WriteLine("Check!");
             drawCondition = IsFiftyMoveRule() || IsDeadPosition() || IsThreefoldRepetition();
         } while (legalMoveExists && !drawCondition);
+        EndGame(currentPlayer);
+    }
+    void EndGame(Player currentPlayer)
+    {
         if (!legalMoveExists && check)
         {
             Console.WriteLine("Checkmate!");
             Console.WriteLine("{0} wins!", currentPlayer);
         }
         else
-        {
             EndGameInDraw();
-        }
     }
     void EndGameInDraw()
     {
@@ -626,30 +631,44 @@ class ChessGame
         while (invalid || !IsMoveLegal(move, player));
         return move;
     }
-    
+    ChessPiece[] GetEmptyRow()
+    {
+        ChessPiece[] emptyRow = new ChessPiece[8];
+        for (int col = 0; col < 8; col++)
+            emptyRow[col] = new EmptyPiece();
+        return emptyRow;
+    }
+    ChessPiece[] GetPawnRow(Player player)
+    {
+        ChessPiece[] pawnRow = new ChessPiece[8];
+        for (int col = 0; col < 8; col++)
+            pawnRow[col] = new Pawn(player);
+        return pawnRow;
+    }
+    ChessPiece[] GetKingRow(Player player)
+    {
+        return new ChessPiece[]
+        {
+            new Rook(player), new Knight(player), new Bishop(player), new Queen(player),
+            new King(player), new Bishop(player), new Knight(player), new Rook(player)
+        };
+    }
     void InitializeBoard()
     {
-        for (int col = 0; col < 8; col++)
+        ChessPiece[][] pieces = 
         {
-            AddPieceToGame(new Pawn(whitePlayer), 1, col);
-            AddPieceToGame(new Pawn(blackPlayer), 6, col);
-        }
-        AddPieceToGame(new Rook(whitePlayer), 0, 0);
-        AddPieceToGame(new Rook(blackPlayer), 7, 0);
-        AddPieceToGame(new Rook(whitePlayer), 0, 7);
-        AddPieceToGame(new Rook(blackPlayer), 7, 7);
-        AddPieceToGame(new Knight(whitePlayer), 0, 1);
-        AddPieceToGame(new Knight(blackPlayer), 7, 1);
-        AddPieceToGame(new Knight(whitePlayer), 0, 6);
-        AddPieceToGame(new Knight(blackPlayer), 7, 6);
-        AddPieceToGame(new Bishop(whitePlayer), 0, 2);
-        AddPieceToGame(new Bishop(blackPlayer), 7, 2);
-        AddPieceToGame(new Bishop(whitePlayer), 0, 5);
-        AddPieceToGame(new Bishop(blackPlayer), 7, 5);
-        AddPieceToGame(new Queen(whitePlayer), 0, 3);
-        AddPieceToGame(new Queen(blackPlayer), 7, 3);
-        AddPieceToGame(new King(whitePlayer), 0, 4);
-        AddPieceToGame(new King(blackPlayer), 7, 4);
+            GetKingRow(whitePlayer),
+            GetPawnRow(whitePlayer),
+            GetEmptyRow(),
+            GetEmptyRow(),
+            GetEmptyRow(),
+            GetEmptyRow(),
+            GetPawnRow(blackPlayer),
+            GetKingRow(blackPlayer)
+        };
+        for (int row = 0; row < 8; row++)
+            for (int col = 0; col < 8; col++)
+                AddPieceToGame(pieces[row][col], row, col);
     }
     void AddPieceToGame(ChessPiece piece, int row, int column)
     {
@@ -742,7 +761,6 @@ class ChessGame
     }
     public bool PlacePiece(ChessPiece piece, int row, int column)
     {
-        
         int oldRow = piece.GetCurrentRow();
         bool result = piece.SetCurrentRow(row);
         if (!result)
@@ -792,26 +810,23 @@ class ChessGame
     {
         endPosition = GetPiece(move.GetEndRow(), move.GetEndColumn());
         capturedPiece = endPosition;
-        bool canMove = MovePiece(move);
-        if (canMove)
+        MovePiece(move);
+        ChessPiece movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
+        movedPiece.UpdateAfterMove(move);
+        // check if move is en passant
+        if (movedPiece is Pawn && move.IsDiagonal() && endPosition is EmptyPiece)
+            capturedPiece = GetPiece(move.GetStartRow(), move.GetEndColumn());
+        // check if move is castling
+        if (movedPiece is King && move.GetColumnDistance() == 2 && move.GetRowDistance() == 0)
         {
-            ChessPiece movedPiece = GetPiece(move.GetEndRow(), move.GetEndColumn());
-            movedPiece.UpdateAfterMove(move);
-            // check if move is en passant
-            if (movedPiece is Pawn && move.IsDiagonal() && endPosition is EmptyPiece)
-                capturedPiece = GetPiece(move.GetStartRow(), move.GetEndColumn());
-            // check if move is castling
-            if (movedPiece is King && move.GetColumnDistance() == 2 && move.GetRowDistance() == 0)
-            {
-                bool kingside = move.GetEndColumn() > move.GetStartColumn();
-                ChessPiece rook = movedPiece.GetPlayer().GetRook(kingside);
-                int rookEndColumn = kingside? move.GetEndColumn() - 1 : move.GetEndColumn() + 1;
-                PlayerMove rookMove = new PlayerMove(rook.GetCurrentRow(), rook.GetCurrentColumn(), rook.GetCurrentRow(), rookEndColumn);
-                MovePiece(rookMove);
-                rook.UpdateAfterMove(rookMove);
-            }
-            capturedPiece.SetCaptured(true);
+            bool kingside = move.GetEndColumn() > move.GetStartColumn();
+            ChessPiece rook = movedPiece.GetPlayer().GetRook(kingside);
+            int rookEndColumn = kingside? move.GetEndColumn() - 1 : move.GetEndColumn() + 1;
+            PlayerMove rookMove = new PlayerMove(rook.GetCurrentRow(), rook.GetCurrentColumn(), rook.GetCurrentRow(), rookEndColumn);
+            MovePiece(rookMove);
+            rook.UpdateAfterMove(rookMove);
         }
+        capturedPiece.SetCaptured(true);
     }
     public void RevertBoard(PlayerMove move)
     {
@@ -1224,7 +1239,6 @@ class PlayerMove
         }
         return -1;
     }
-    
 }
 class Position
 {
