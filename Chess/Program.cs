@@ -682,21 +682,30 @@ class ChessGame
     }
     void InitializeBoard()
     {
-        ChessPiece[][] pieces = 
-        {
-            GetKingRow(whitePlayer),
-            GetPawnRow(whitePlayer),
-            GetEmptyRow(),
-            GetEmptyRow(),
-            GetEmptyRow(),
-            GetEmptyRow(),
-            GetPawnRow(blackPlayer),
-            GetKingRow(blackPlayer)
-        };
-        
         for (int row = 0; row < 8; row++)
+        {
+            ChessPiece[] rowToInit = GetEmptyRow();
+            switch (row)
+            {
+                case 0:
+                    rowToInit = GetKingRow(whitePlayer);
+                    break;
+                case 1:
+                    rowToInit = GetPawnRow(whitePlayer);
+                    break;
+                case 6:
+                    rowToInit = GetPawnRow(blackPlayer);
+                    break;
+                case 7:
+                    rowToInit = GetKingRow(blackPlayer);
+                    break;
+                default:
+                    break;
+            }
             for (int col = 0; col < 8; col++)
-                AddPieceToGame(pieces[row][col], row, col);
+                AddPieceToGame(rowToInit[col], row, col);
+        }
+            
     }
     void AddPieceToGame(ChessPiece piece, int row, int column)
     {
